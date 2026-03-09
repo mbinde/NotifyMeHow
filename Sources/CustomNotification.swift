@@ -124,15 +124,10 @@ class CustomNotificationManager {
         let scaledWidth = config.width * config.scaleFactor
         let scaledPadding = config.padding * config.scaleFactor
         let scaledCornerRadius = config.cornerRadius * config.scaleFactor
-
-        // Create content view
-        let contentView = NSView()
-        contentView.wantsLayer = true
-        contentView.layer?.backgroundColor = config.backgroundColor.cgColor
-        contentView.layer?.cornerRadius = scaledCornerRadius
-
-        var yOffset = scaledPadding
         let textWidth = scaledWidth - (scaledPadding * 2)
+
+        // Collect all labels first to calculate total height
+        var labels: [NSTextField] = []
 
         // App name (small, at top)
         if !content.appName.isEmpty {
@@ -142,9 +137,7 @@ class CustomNotificationManager {
                 color: config.subtitleColor.withAlphaComponent(0.6),
                 width: textWidth
             )
-            appLabel.frame.origin = CGPoint(x: scaledPadding, y: 0)  // Will adjust later
-            contentView.addSubview(appLabel)
-            yOffset += appLabel.frame.height + 4
+            labels.append(appLabel)
         }
 
         // Title
@@ -156,9 +149,7 @@ class CustomNotificationManager {
                 width: textWidth,
                 bold: true
             )
-            titleLabel.frame.origin = CGPoint(x: scaledPadding, y: 0)
-            contentView.addSubview(titleLabel)
-            yOffset += titleLabel.frame.height + 4
+            labels.append(titleLabel)
         }
 
         // Subtitle
@@ -169,9 +160,7 @@ class CustomNotificationManager {
                 color: config.subtitleColor,
                 width: textWidth
             )
-            subtitleLabel.frame.origin = CGPoint(x: scaledPadding, y: 0)
-            contentView.addSubview(subtitleLabel)
-            yOffset += subtitleLabel.frame.height + 4
+            labels.append(subtitleLabel)
         }
 
         // Body
@@ -182,22 +171,38 @@ class CustomNotificationManager {
                 color: config.bodyColor,
                 width: textWidth
             )
-            bodyLabel.frame.origin = CGPoint(x: scaledPadding, y: 0)
-            contentView.addSubview(bodyLabel)
-            yOffset += bodyLabel.frame.height
+            labels.append(bodyLabel)
         }
 
-        yOffset += scaledPadding
-
-        // Now position all subviews from top to bottom
-        var currentY = yOffset - scaledPadding
-        for subview in contentView.subviews.reversed() {
-            currentY -= subview.frame.height
-            subview.frame.origin.y = currentY
-            currentY -= 4
+        // Calculate total height
+        let spacing: CGFloat = 4
+        var totalHeight = scaledPadding * 2
+        for label in labels {
+            totalHeight += label.frame.height + spacing
         }
+        totalHeight -= spacing  // Remove last spacing
 
-        let windowHeight = min(yOffset, config.maxHeight * config.scaleFactor)
+        let windowHeight = min(totalHeight, config.maxHeight * config.scaleFactor)
+
+        // Create content view using NSBox for reliable background
+        let box = NSBox(frame: NSRect(x: 0, y: 0, width: scaledWidth, height: windowHeight))
+        box.boxType = .custom
+        box.fillColor = config.backgroundColor
+        box.borderColor = .clear
+        box.borderWidth = 0
+        box.cornerRadius = scaledCornerRadius
+        box.contentViewMargins = .zero
+
+        let contentView = box
+
+        // Position labels from top to bottom (Cocoa coords: y=0 is bottom)
+        var currentY = windowHeight - scaledPadding
+        for label in labels {
+            currentY -= label.frame.height
+            label.frame.origin = CGPoint(x: scaledPadding, y: currentY)
+            contentView.addSubview(label)
+            currentY -= spacing
+        }
 
         // Create window
         let window = NSWindow(

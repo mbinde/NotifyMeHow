@@ -123,17 +123,7 @@ func parsePosition(_ str: String) -> NotificationPosition {
 }
 
 func parseColor(_ str: String) -> NSColor {
-    // Support hex colors like "#FF0000" or "FF0000"
-    var hex = str.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-    if hex.count == 6 {
-        var rgb: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&rgb)
-        let r = CGFloat((rgb >> 16) & 0xFF) / 255.0
-        let g = CGFloat((rgb >> 8) & 0xFF) / 255.0
-        let b = CGFloat(rgb & 0xFF) / 255.0
-        return NSColor(red: r, green: g, blue: b, alpha: 0.9)
-    }
-    // Named colors
+    // Named colors first (check before hex since "purple" is 6 chars)
     switch str.lowercased() {
     case "black": return NSColor.black.withAlphaComponent(0.85)
     case "white": return NSColor.white.withAlphaComponent(0.9)
@@ -143,6 +133,16 @@ func parseColor(_ str: String) -> NSColor {
     case "purple": return NSColor.systemPurple.withAlphaComponent(0.9)
     case "orange": return NSColor.systemOrange.withAlphaComponent(0.9)
     default:
+        // Try hex color like "#FF0000" or "FF0000"
+        let hex = str.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        if hex.count == 6, hex.allSatisfy({ $0.isHexDigit }) {
+            var rgb: UInt64 = 0
+            Scanner(string: hex).scanHexInt64(&rgb)
+            let r = CGFloat((rgb >> 16) & 0xFF) / 255.0
+            let g = CGFloat((rgb >> 8) & 0xFF) / 255.0
+            let b = CGFloat(rgb & 0xFF) / 255.0
+            return NSColor(red: r, green: g, blue: b, alpha: 0.9)
+        }
         print("Unknown color: \(str), using black")
         return NSColor.black.withAlphaComponent(0.85)
     }
@@ -401,6 +401,7 @@ if parsedArgs.enableCustom {
     print("  Scale: \(parsedArgs.customScale)x")
     print("  Opacity: \(parsedArgs.customOpacity)")
     print("  Dwell time: \(parsedArgs.customDwell)s")
+    print("  Color: \(customConfig.backgroundColor)")
 }
 
 monitor.start()
