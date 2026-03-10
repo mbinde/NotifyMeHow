@@ -556,6 +556,11 @@ class CustomNotificationManager {
             y -= stackOffset
         }
 
+        // Clamp to screen bounds to prevent off-screen notifications
+        // (e.g., when importing settings from a different screen size)
+        x = max(screenFrame.minX, min(x, screenFrame.maxX - windowFrame.width))
+        y = max(screenFrame.minY, min(y, screenFrame.maxY - windowFrame.height))
+
         window.setFrameOrigin(CGPoint(x: x, y: y))
     }
 }
