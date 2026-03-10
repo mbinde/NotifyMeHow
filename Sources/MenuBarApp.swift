@@ -95,11 +95,6 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
         toggleItem.tag = 101
         statusMenu.addItem(toggleItem)
 
-        // Test notification
-        let testItem = NSMenuItem(title: "Send Test Notification", action: #selector(sendTestNotification(_:)), keyEquivalent: "t")
-        testItem.target = self
-        statusMenu.addItem(testItem)
-
         statusMenu.addItem(NSMenuItem.separator())
 
         // Advanced Settings
@@ -194,39 +189,6 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
 
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "bell.badge", accessibilityDescription: "NotifyMeHow")
-        }
-    }
-
-    @objc func sendTestNotification(_ sender: NSMenuItem) {
-        let center = UNUserNotificationCenter.current()
-
-        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
-            if granted {
-                let content = UNMutableNotificationContent()
-                content.title = "Test Notification"
-                content.body = "This is a test notification from NotifyMeHow"
-                content.sound = .default
-
-                let request = UNNotificationRequest(
-                    identifier: UUID().uuidString,
-                    content: content,
-                    trigger: nil
-                )
-
-                center.add(request) { error in
-                    if let error = error {
-                        print("Failed to send notification: \(error)")
-                    }
-                }
-            } else {
-                DispatchQueue.main.async {
-                    let script = "display notification \"Test from NotifyMeHow\" with title \"Test Notification\""
-                    let task = Process()
-                    task.launchPath = "/usr/bin/osascript"
-                    task.arguments = ["-e", script]
-                    try? task.run()
-                }
-            }
         }
     }
 

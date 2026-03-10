@@ -365,6 +365,24 @@ class StyleControlsView: NSView {
 
     // MARK: - Actions
 
+    /// Show a preview notification using the current style settings
+    func showPreview() {
+        let currentStyle = style
+
+        // Create sample notification content
+        var content = NotificationContent()
+        content.appName = "Preview"
+        content.title = "Sample Notification"
+        content.subtitle = "This is a preview"
+        content.body = "This shows how your notification style will look with real content."
+        content.appIcon = NSImage(systemSymbolName: "bell.fill", accessibilityDescription: nil)
+
+        // Show the notification using current style
+        let config = currentStyle.toConfig()
+        CustomNotificationManager.shared.configure(config)
+        CustomNotificationManager.shared.showNotification(content: content)
+    }
+
     @objc private func scaleChanged() {
         scaleLabel.stringValue = String(format: "%.1fx", scaleSlider.doubleValue)
     }

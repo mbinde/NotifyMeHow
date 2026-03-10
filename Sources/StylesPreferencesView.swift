@@ -287,6 +287,11 @@ class StyleEditorWindowController: NSWindowController {
         contentView.addSubview(styleControlsView)
 
         // Buttons at bottom
+        let previewButton = NSButton(title: "Preview", target: self, action: #selector(preview))
+        previewButton.bezelStyle = .rounded
+        previewButton.frame = NSRect(x: padding, y: 20, width: 80, height: 28)
+        contentView.addSubview(previewButton)
+
         let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancel))
         cancelButton.bezelStyle = .rounded
         cancelButton.frame = NSRect(x: contentView.frame.width - padding - 170, y: 20, width: 80, height: 28)
@@ -298,6 +303,10 @@ class StyleEditorWindowController: NSWindowController {
         saveButton.frame = NSRect(x: contentView.frame.width - padding - 80, y: 20, width: 80, height: 28)
         saveButton.keyEquivalent = "\r"
         contentView.addSubview(saveButton)
+    }
+
+    @objc private func preview() {
+        styleControlsView.showPreview()
     }
 
     private func loadStyle() {

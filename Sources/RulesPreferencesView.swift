@@ -305,6 +305,7 @@ class RuleEditorWindowController: NSWindowController {
     private var stylePopup: NSPopUpButton!
     private var customStyleContainer: NSView!
     private var styleControlsView: StyleControlsView!
+    private var previewButton: NSButton!
 
     // Track if we're editing a custom style
     private var isCustomStyle = false
@@ -317,7 +318,7 @@ class RuleEditorWindowController: NSWindowController {
         self.onSave = onSave
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 590),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 720),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -409,9 +410,14 @@ class RuleEditorWindowController: NSWindowController {
         styleControlsView.parentWindow = window
         customStyleContainer.addSubview(styleControlsView)
 
+        // Buttons (always at bottom)
+        previewButton = NSButton(title: "Preview", target: self, action: #selector(preview))
+        previewButton.bezelStyle = .rounded
+        previewButton.frame = NSRect(x: padding, y: 20, width: 80, height: 28)
+        contentView.addSubview(previewButton)
+
         updateCustomStyleVisibility()
 
-        // Buttons (always at bottom)
         let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancel))
         cancelButton.bezelStyle = .rounded
         cancelButton.frame = NSRect(x: contentView.frame.width - padding - 170, y: 20, width: 80, height: 28)
@@ -510,6 +516,11 @@ class RuleEditorWindowController: NSWindowController {
 
     private func updateCustomStyleVisibility() {
         customStyleContainer.isHidden = !isCustomStyle
+        previewButton.isHidden = !isCustomStyle
+    }
+
+    @objc private func preview() {
+        styleControlsView.showPreview()
     }
 
     /// Check if the current style values differ from the original editingStyle
