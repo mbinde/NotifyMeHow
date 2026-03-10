@@ -786,7 +786,7 @@ class RuleEditorWindowController: NSWindowController {
             // "Custom..." - create a new style and save it
             var newStyle = buildStyleFromForm()
             newStyle.id = UUID()  // Ensure new ID
-            newStyle.name = "Style for \(rule.displayName)"
+            newStyle.name = generateUniqueStyleName()
             StylesManager.shared.addStyle(newStyle)
             rule.styleId = newStyle.id
             finalizeSave()
@@ -839,13 +839,34 @@ class RuleEditorWindowController: NSWindowController {
                     // Save as new style
                     var newStyle = buildStyleFromForm()
                     newStyle.id = UUID()
-                    newStyle.name = "\(originalStyle.name) (copy)"
+                    newStyle.name = generateUniqueStyleName()
                     StylesManager.shared.addStyle(newStyle)
                     rule.styleId = newStyle.id
                     finalizeSave()
                 }
                 // Cancel - do nothing, stay in editor
             }
+        }
+    }
+
+    /// Generate a unique style name based on the rule's display name
+    private func generateUniqueStyleName() -> String {
+        let baseName = "Style for \(rule.displayName)"
+        let existingNames = Set(StylesManager.shared.styles.map { $0.name })
+
+        // If base name doesn't exist, use it
+        if !existingNames.contains(baseName) {
+            return baseName
+        }
+
+        // Otherwise, find the next available number
+        var counter = 2
+        while true {
+            let candidateName = "\(baseName) \(counter)"
+            if !existingNames.contains(candidateName) {
+                return candidateName
+            }
+            counter += 1
         }
     }
 
