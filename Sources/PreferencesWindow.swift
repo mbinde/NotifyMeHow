@@ -156,20 +156,27 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
 
         // Export/Import
         y -= 40
-        let configHeader = createLabel("Configuration", bold: true)
+        let configHeader = createLabel("Backup & Transfer", bold: true)
         configHeader.frame = NSRect(x: padding, y: y, width: 200, height: 20)
         addSubview(configHeader)
 
-        y -= 35
-        let exportButton = NSButton(frame: NSRect(x: padding, y: y, width: 130, height: 28))
-        exportButton.title = "Export Settings..."
+        y -= 18
+        let configHint = createLabel("Export all settings, styles, and rules to copy to another computer.")
+        configHint.font = NSFont.systemFont(ofSize: 11)
+        configHint.textColor = .secondaryLabelColor
+        configHint.frame = NSRect(x: padding, y: y, width: 400, height: 16)
+        addSubview(configHint)
+
+        y -= 30
+        let exportButton = NSButton(frame: NSRect(x: padding, y: y, width: 100, height: 28))
+        exportButton.title = "Export..."
         exportButton.bezelStyle = .rounded
         exportButton.target = self
         exportButton.action = #selector(exportSettings)
         addSubview(exportButton)
 
-        let importButton = NSButton(frame: NSRect(x: padding + 145, y: y, width: 130, height: 28))
-        importButton.title = "Import Settings..."
+        let importButton = NSButton(frame: NSRect(x: padding + 110, y: y, width: 100, height: 28))
+        importButton.title = "Import..."
         importButton.bezelStyle = .rounded
         importButton.target = self
         importButton.action = #selector(importSettings)

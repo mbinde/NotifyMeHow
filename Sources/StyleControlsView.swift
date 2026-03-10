@@ -70,6 +70,10 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         posLabel.frame = NSRect(x: padding, y: y, width: 80, height: 22)
         addSubview(posLabel)
 
+        let posHelp = createHelpButton("Where the custom notification appears on screen. This is independent of where macOS places the system notification.")
+        posHelp.frame = NSRect(x: padding + 60, y: y + 4, width: 14, height: 14)
+        addSubview(posHelp)
+
         positionPopup = NSPopUpButton(frame: NSRect(x: padding + 85, y: y, width: 140, height: 26), pullsDown: false)
         positionPopup.addItems(withTitles: [
             "Top Left", "Top Center", "Top Right",
@@ -109,8 +113,12 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         // Scale
         y -= 28
         let scaleTextLabel = createLabel("Scale:")
-        scaleTextLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
+        scaleTextLabel.frame = NSRect(x: padding, y: y, width: 38, height: 22)
         addSubview(scaleTextLabel)
+
+        let scaleHelp = createHelpButton("Make the notification larger or smaller. 1.0x is standard size, 2.0x is double size.")
+        scaleHelp.frame = NSRect(x: padding + 40, y: y + 4, width: 14, height: 14)
+        addSubview(scaleHelp)
 
         scaleSlider = NSSlider(frame: NSRect(x: padding + 55, y: y, width: 180, height: 22))
         scaleSlider.minValue = 0.5
@@ -143,10 +151,14 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         // Display time (1-30 seconds, or 31 = indefinite)
         y -= 28
         let dwellTextLabel = createLabel("Display:")
-        dwellTextLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
+        dwellTextLabel.frame = NSRect(x: padding, y: y, width: 48, height: 22)
         addSubview(dwellTextLabel)
 
-        dwellSlider = NSSlider(frame: NSRect(x: padding + 55, y: y, width: 180, height: 22))
+        let dwellHelp = createHelpButton("How long the notification stays on screen before auto-dismissing. 'Indefinite' means it stays until you click the X button.")
+        dwellHelp.frame = NSRect(x: padding + 50, y: y + 4, width: 14, height: 14)
+        addSubview(dwellHelp)
+
+        dwellSlider = NSSlider(frame: NSRect(x: padding + 70, y: y, width: 165, height: 22))
         dwellSlider.minValue = 1
         dwellSlider.maxValue = 31  // 31 = indefinite
         dwellSlider.target = self
@@ -154,7 +166,7 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         addSubview(dwellSlider)
 
         dwellLabel = createLabel("5s")
-        dwellLabel.frame = NSRect(x: padding + 240, y: y, width: 70, height: 22)
+        dwellLabel.frame = NSRect(x: padding + 240, y: y, width: 55, height: 22)
         addSubview(dwellLabel)
 
         // Colors
@@ -293,10 +305,14 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         // Animation
         y -= 35
         let animationLabel = createLabel("Animation:")
-        animationLabel.frame = NSRect(x: padding, y: y, width: 65, height: 22)
+        animationLabel.frame = NSRect(x: padding, y: y, width: 62, height: 22)
         addSubview(animationLabel)
 
-        animationPopup = NSPopUpButton(frame: NSRect(x: padding + 70, y: y, width: 120, height: 26), pullsDown: false)
+        let animHelp = createHelpButton("Add eye-catching animation to the notification. 'Loop' repeats the animation continuously until dismissed.")
+        animHelp.frame = NSRect(x: padding + 64, y: y + 6, width: 14, height: 14)
+        addSubview(animHelp)
+
+        animationPopup = NSPopUpButton(frame: NSRect(x: padding + 85, y: y, width: 105, height: 26), pullsDown: false)
         animationPopup.addItems(withTitles: ["None", "Pulse", "Jiggle", "Wiggle", "Bounce"])
         animationPopup.selectItem(at: 0)
         addSubview(animationPopup)
@@ -494,6 +510,59 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         label.isEditable = false
         label.isSelectable = false
         return label
+    }
+
+    private func createHelpButton(_ helpText: String) -> NSButton {
+        let button = NSButton(frame: NSRect(x: 0, y: 0, width: 14, height: 14))
+        button.isBordered = false
+        button.image = NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: "Help")
+        button.imageScaling = .scaleProportionallyDown
+        button.contentTintColor = .secondaryLabelColor
+        button.setAccessibilityLabel(helpText)
+        button.target = self
+        button.action = #selector(showHelpPopover(_:))
+        // Store help text in identifier for retrieval
+        button.identifier = NSUserInterfaceItemIdentifier(helpText)
+        return button
+    }
+
+    @objc private func showHelpPopover(_ sender: NSButton) {
+        guard let helpText = sender.identifier?.rawValue else { return }
+
+        let popover = NSPopover()
+        popover.behavior = .transient
+
+        // Create text field with proper wrapping
+        let textField = NSTextField(frame: NSRect(x: 10, y: 10, width: 230, height: 200))
+        textField.stringValue = helpText
+        textField.font = NSFont.systemFont(ofSize: 12)
+        textField.isEditable = false
+        textField.isBordered = false
+        textField.drawsBackground = false
+        textField.isSelectable = false
+        textField.lineBreakMode = .byWordWrapping
+        textField.cell?.wraps = true
+        textField.cell?.isScrollable = false
+        textField.preferredMaxLayoutWidth = 230
+
+        // Calculate required height
+        let maxSize = NSSize(width: 230, height: CGFloat.greatestFiniteMagnitude)
+        let boundingRect = (helpText as NSString).boundingRect(
+            with: maxSize,
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: textField.font!]
+        )
+        let textHeight = ceil(boundingRect.height) + 10
+
+        textField.frame = NSRect(x: 10, y: 10, width: 230, height: textHeight)
+
+        let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 250, height: textHeight + 20))
+        contentView.addSubview(textField)
+
+        let viewController = NSViewController()
+        viewController.view = contentView
+        popover.contentViewController = viewController
+        popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .maxY)
     }
 
     private func cornerToIndex(_ corner: String) -> Int {
