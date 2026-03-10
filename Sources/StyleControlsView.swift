@@ -1,7 +1,7 @@
 import Cocoa
 
 /// A reusable view containing all style editing controls (position, colors, icon, etc.)
-class StyleControlsView: NSView {
+class StyleControlsView: NSView, NSTextFieldDelegate {
 
     // MARK: - Public Properties
 
@@ -76,6 +76,8 @@ class StyleControlsView: NSView {
             "Middle Left", "Center", "Middle Right",
             "Bottom Left", "Bottom Center", "Bottom Right"
         ])
+        positionPopup.target = self
+        positionPopup.action = #selector(positionChanged)
         addSubview(positionPopup)
 
         // Offset
@@ -89,6 +91,7 @@ class StyleControlsView: NSView {
         addSubview(xLabel)
 
         offsetXField = NSTextField(frame: NSRect(x: padding + 75, y: y, width: 45, height: 22))
+        offsetXField.delegate = self
         addSubview(offsetXField)
 
         let yLabel = createLabel("Y:")
@@ -96,6 +99,7 @@ class StyleControlsView: NSView {
         addSubview(yLabel)
 
         offsetYField = NSTextField(frame: NSRect(x: padding + 150, y: y, width: 45, height: 22))
+        offsetYField.delegate = self
         addSubview(offsetYField)
 
         let pxLabel = createLabel("px")
@@ -360,6 +364,9 @@ class StyleControlsView: NSView {
 
         animationPopup.selectItem(at: animationToIndex(style.animation))
         animationLoopsCheckbox.state = style.animationLoops ? .on : .off
+
+        // Validate offsets after loading
+        validateOffsets()
     }
 
     private func buildStyleFromControls() -> NotificationStyle {
@@ -410,6 +417,11 @@ class StyleControlsView: NSView {
 
     @objc private func scaleChanged() {
         scaleLabel.stringValue = String(format: "%.1fx", scaleSlider.doubleValue)
+        validateOffsets()
+    }
+
+    @objc private func positionChanged() {
+        validateOffsets()
     }
 
     @objc private func opacityChanged() {
@@ -552,5 +564,59 @@ class StyleControlsView: NSView {
         let g = Int(rgbColor.greenComponent * 255)
         let b = Int(rgbColor.blueComponent * 255)
         return String(format: "%02X%02X%02X", r, g, b)
+    }
+
+    // MARK: - NSTextFieldDelegate
+
+    func controlTextDidChange(_ obj: Notification) {
+        validateOffsets()
+    }
+
+    /// Check if current offsets would push notification off-screen and highlight fields in red if so
+    private func validateOffsets() {
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+
+        let offsetX = CGFloat(Double(offsetXField.stringValue) ?? 0)
+        let offsetY = CGFloat(Double(offsetYField.stringValue) ?? 0)
+        let scale = CGFloat(scaleSlider.doubleValue)
+
+        // Estimate notification size (base size * scale)
+        let estimatedWidth: CGFloat = 360 * scale
+        let estimatedHeight: CGFloat = 100 * scale
+
+        let corner = indexToCorner(positionPopup.indexOfSelectedItem)
+
+        // Calculate where the notification would be positioned
+        var wouldBeOffScreenX = false
+        var wouldBeOffScreenY = false
+
+        switch corner {
+        case "topRight", "middleRight", "bottomRight":
+            // X offset pushes left from right edge
+            wouldBeOffScreenX = offsetX > screenFrame.width - estimatedWidth
+        case "topLeft", "middleLeft", "bottomLeft":
+            // X offset pushes right from left edge
+            wouldBeOffScreenX = offsetX > screenFrame.width - estimatedWidth
+        default:
+            // Center positions ignore X offset
+            break
+        }
+
+        switch corner {
+        case "topLeft", "topCenter", "topRight":
+            // Y offset pushes down from top
+            wouldBeOffScreenY = offsetY > screenFrame.height - estimatedHeight
+        case "bottomLeft", "bottomCenter", "bottomRight":
+            // Y offset pushes up from bottom
+            wouldBeOffScreenY = offsetY > screenFrame.height - estimatedHeight
+        default:
+            // Center positions ignore Y offset
+            break
+        }
+
+        // Update field colors
+        offsetXField.textColor = wouldBeOffScreenX ? .systemRed : .labelColor
+        offsetYField.textColor = wouldBeOffScreenY ? .systemRed : .labelColor
     }
 }
