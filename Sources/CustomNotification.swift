@@ -26,7 +26,8 @@ struct CustomNotificationConfig {
     var showAppName: Bool = true  // Whether to show app name label
     var borderWidth: CGFloat = 0  // Border width (0 = none)
     var borderColor: NSColor = .white  // Border color
-    var animation: String = "none"  // Animation type: none, pulse, jiggle, bounce
+    var animation: String = "none"  // Animation type: none, pulse, jiggle, wiggle, bounce
+    var animationLoops: Bool = false  // Whether animation repeats continuously
 }
 
 /// Content extracted from a notification
@@ -209,6 +210,8 @@ class CustomNotificationManager {
         contentView.wantsLayer = true
         guard let layer = contentView.layer else { return }
 
+        let repeatCount: Float = config.animationLoops ? .infinity : 1
+
         switch config.animation {
         case "pulse":
             let pulse = CABasicAnimation(keyPath: "opacity")
@@ -216,24 +219,35 @@ class CustomNotificationManager {
             pulse.toValue = config.opacity * 0.6
             pulse.duration = 0.8
             pulse.autoreverses = true
-            pulse.repeatCount = .infinity
+            pulse.repeatCount = repeatCount
             pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             layer.add(pulse, forKey: "pulse")
 
         case "jiggle":
             let jiggle = CAKeyframeAnimation(keyPath: "transform.rotation.z")
-            let angle = Double.pi / 60  // ~3 degrees
+            let angle = Double.pi / 90  // ~2 degrees
             jiggle.values = [-angle, angle, -angle]
-            jiggle.duration = 0.15
-            jiggle.repeatCount = .infinity
+            jiggle.duration = 0.2
+            jiggle.repeatCount = repeatCount
+            jiggle.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             layer.add(jiggle, forKey: "jiggle")
+
+        case "wiggle":
+            // Decaying wiggle that settles down
+            let wiggle = CAKeyframeAnimation(keyPath: "transform.rotation.z")
+            let angle = Double.pi / 60  // ~3 degrees
+            wiggle.values = [0, -angle, angle, -angle * 0.6, angle * 0.6, -angle * 0.3, angle * 0.3, 0]
+            wiggle.keyTimes = [0, 0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 1.0]
+            wiggle.duration = 0.6
+            wiggle.repeatCount = repeatCount
+            layer.add(wiggle, forKey: "wiggle")
 
         case "bounce":
             let bounce = CAKeyframeAnimation(keyPath: "transform.scale")
             bounce.values = [1.0, 1.05, 0.98, 1.02, 1.0]
             bounce.keyTimes = [0, 0.2, 0.5, 0.75, 1.0]
             bounce.duration = 0.5
-            bounce.repeatCount = .infinity
+            bounce.repeatCount = repeatCount
             bounce.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             layer.add(bounce, forKey: "bounce")
 

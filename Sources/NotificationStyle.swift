@@ -20,7 +20,8 @@ struct NotificationStyle: Codable, Identifiable {
     var showAppName: Bool = false                // Whether to show app name label
     var borderWidth: Double = 0                  // Border width (0 = none)
     var borderColorHex: String = "FFFFFF"        // Border color
-    var animation: String = "none"               // Animation type: none, pulse, jiggle, bounce
+    var animation: String = "none"               // Animation type: none, pulse, jiggle, wiggle, bounce
+    var animationLoops: Bool = false             // Whether animation repeats continuously
 
     /// Convert to CustomNotificationConfig
     func toConfig() -> CustomNotificationConfig {
@@ -52,6 +53,7 @@ struct NotificationStyle: Codable, Identifiable {
         config.borderWidth = CGFloat(borderWidth)
         config.borderColor = colorFromHex(borderColorHex)
         config.animation = animation
+        config.animationLoops = animationLoops
 
         return config
     }

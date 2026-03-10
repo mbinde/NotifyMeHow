@@ -36,6 +36,7 @@ class StyleControlsView: NSView {
     private var borderWidthLabel: NSTextField!
     private var borderColorWell: NSColorWell!
     private var animationPopup: NSPopUpButton!
+    private var animationLoopsCheckbox: NSButton!
 
     // State
     private var customIconPath: String?
@@ -287,9 +288,13 @@ class StyleControlsView: NSView {
         addSubview(animationLabel)
 
         animationPopup = NSPopUpButton(frame: NSRect(x: padding + 70, y: y, width: 120, height: 26), pullsDown: false)
-        animationPopup.addItems(withTitles: ["None", "Pulse", "Jiggle", "Bounce"])
+        animationPopup.addItems(withTitles: ["None", "Pulse", "Jiggle", "Wiggle", "Bounce"])
         animationPopup.selectItem(at: 0)
         addSubview(animationPopup)
+
+        animationLoopsCheckbox = NSButton(checkboxWithTitle: "Loop", target: nil, action: nil)
+        animationLoopsCheckbox.frame = NSRect(x: padding + 200, y: y + 3, width: 60, height: 20)
+        addSubview(animationLoopsCheckbox)
 
         // Load defaults
         loadStyleIntoControls(NotificationStyle())
@@ -338,6 +343,7 @@ class StyleControlsView: NSView {
         borderColorWell.color = colorFromHex(style.borderColorHex)
 
         animationPopup.selectItem(at: animationToIndex(style.animation))
+        animationLoopsCheckbox.state = style.animationLoops ? .on : .off
     }
 
     private func buildStyleFromControls() -> NotificationStyle {
@@ -360,6 +366,7 @@ class StyleControlsView: NSView {
         style.borderWidth = borderWidthSlider.doubleValue
         style.borderColorHex = hexFromColor(borderColorWell.color)
         style.animation = indexToAnimation(animationPopup.indexOfSelectedItem)
+        style.animationLoops = animationLoopsCheckbox.state == .on
         return style
     }
 
@@ -484,7 +491,8 @@ class StyleControlsView: NSView {
         switch animation {
         case "pulse": return 1
         case "jiggle": return 2
-        case "bounce": return 3
+        case "wiggle": return 3
+        case "bounce": return 4
         default: return 0
         }
     }
@@ -493,7 +501,8 @@ class StyleControlsView: NSView {
         switch index {
         case 1: return "pulse"
         case 2: return "jiggle"
-        case 3: return "bounce"
+        case 3: return "wiggle"
+        case 4: return "bounce"
         default: return "none"
         }
     }
