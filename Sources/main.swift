@@ -256,8 +256,8 @@ func runDebugMode() {
         print()
     }
 
-    // Also search for specific banner subroles like PingPlace does
-    print("\n=== Searching for Banner Subroles (like PingPlace) ===")
+    // Also search for specific banner subroles
+    print("\n=== Searching for Banner Subroles ===")
     let banners = findNotificationBanners()
     print("Total banner elements found: \(banners.count)\n")
 

@@ -212,7 +212,7 @@ func findNotificationBanners(verbose: Bool = true) -> [AXUIElement] {
 
     let app = AXUIElementCreateApplication(pid)
 
-    // Look for elements with these specific subroles that PingPlace uses
+    // Look for elements with these specific subroles
     let bannerSubroles = [
         "AXNotificationCenterBanner",
         "AXNotificationCenterBannerWindow",

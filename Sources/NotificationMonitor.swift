@@ -46,10 +46,17 @@ class NotificationMonitor {
     private var scaleFactor: CGFloat
     private var showCustomNotification: Bool = false
     private var customConfig: CustomNotificationConfig?
+    private var seenBanners: Set<String> = []  // Track banners we've already processed
 
-    // Track recently shown notifications to avoid duplicates
+    // Cached initial notification data for relative positioning
+    private var cachedInitialPosition: CGPoint?
+    private var cachedInitialWindowSize: CGSize?
+    private var cachedInitialNotifSize: CGSize?
+    private var cachedInitialPadding: CGFloat?
+
+    // Track recently shown notifications to avoid duplicates but allow different content
     private var recentNotifications: [(content: String, time: Date)] = []
-    private let dedupeWindow: TimeInterval = 0.5
+    private let dedupeWindow: TimeInterval = 0.5  // Ignore exact duplicates within 0.5 seconds
 
     init(position: NotificationPosition = .bottomRight, scaleFactor: CGFloat = 1.0) {
         self.targetPosition = position
@@ -69,12 +76,30 @@ class NotificationMonitor {
         self.customConfig = nil
     }
 
-    func start() {
-        guard checkAccessibilityPermissions() else {
-            print("ERROR: Accessibility permissions not granted.")
-            return
-        }
+    private var permissionTimer: Timer?
 
+    func start() {
+        if checkAccessibilityPermissions() {
+            startObserver()
+        } else {
+            print("Accessibility permissions not granted yet, will poll...")
+            startPermissionPolling()
+        }
+    }
+
+    private func startPermissionPolling() {
+        permissionTimer?.invalidate()
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            if hasAccessibilityPermissions() {
+                print("Accessibility permissions granted!")
+                self?.permissionTimer?.invalidate()
+                self?.permissionTimer = nil
+                self?.startObserver()
+            }
+        }
+    }
+
+    private func startObserver() {
         guard let pid = getNotificationCenterPID() else {
             print("ERROR: Could not find NotificationCenter process")
             return
@@ -101,7 +126,7 @@ class NotificationMonitor {
         let app = AXUIElementCreateApplication(pid)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
 
-        // Watch for window creation and content updates
+        // Watch for window creation, focus changes, and content updates
         let notifications = [
             kAXWindowCreatedNotification,
             kAXFocusedWindowChangedNotification,
@@ -129,9 +154,10 @@ class NotificationMonitor {
         isRunning = true
         print("Notification monitor started.")
         print("Target position: \(targetPosition.corner), offset: (\(targetPosition.offsetX), \(targetPosition.offsetY))")
+        print("Scale factor: \(scaleFactor)")
 
-        // Reposition any existing notifications
-        repositionAllNotifications()
+        // Also reposition any existing notification windows
+        repositionExistingNotifications()
     }
 
     func stop() {
@@ -142,6 +168,8 @@ class NotificationMonitor {
                 .defaultMode
             )
         }
+        permissionTimer?.invalidate()
+        permissionTimer = nil
         observer = nil
         isRunning = false
         print("Notification monitor stopped.")
@@ -149,7 +177,8 @@ class NotificationMonitor {
 
     func setPosition(_ position: NotificationPosition) {
         targetPosition = position
-        repositionAllNotifications()
+        print("Position updated to: \(position.corner)")
+        repositionExistingNotifications()
     }
 
     func setScaleFactor(_ factor: CGFloat) {
@@ -157,141 +186,77 @@ class NotificationMonitor {
         print("Scale factor updated to: \(factor)")
     }
 
-    // MARK: - Notification Handling
-
     private func handleNotification(element: AXUIElement, notification: String) {
+        // For window creation or content changes, process the notification
         if notification == kAXWindowCreatedNotification as String ||
            notification == kAXValueChangedNotification as String ||
            notification == kAXLayoutChangedNotification as String {
-            processNotificationWindow(element)
+            repositionNotificationWindow(element)
         }
     }
 
-    /// Process a notification window - reposition it and optionally show custom notification
-    private func processNotificationWindow(_ window: AXUIElement) {
-        // Find the banner within the window
+    /// Move notification using relative positioning on the window
+    private func repositionNotificationWindow(_ window: AXUIElement) {
+        // Find the banner container within the window
         let targetSubroles = ["AXNotificationCenterBanner", "AXNotificationCenterAlert"]
-        guard let banner = findElementWithSubrole(window, targetSubroles: targetSubroles) else {
+        guard let windowSize = getSize(of: window),
+              let bannerContainer = findElementWithSubrole(window, targetSubroles: targetSubroles),
+              let notifSize = getSize(of: bannerContainer),
+              let position = getPosition(of: bannerContainer) else {
             return
         }
 
-        // Reposition the notification
-        repositionBanner(banner)
+        // Reposition notification (skip if topRight - the default position)
+        let shouldReposition = !(targetPosition.corner == .topRight)
+        if shouldReposition {
+            // Cache initial data if not already cached
+            if cachedInitialPosition == nil {
+                cacheInitialNotificationData(windowSize: windowSize, notifSize: notifSize, position: position)
+            }
 
-        // Show custom notification if rules match
-        showCustomNotificationIfNeeded(from: banner)
-    }
+            if let cachedPos = cachedInitialPosition,
+               let cachedWinSize = cachedInitialWindowSize,
+               let cachedNotifSize = cachedInitialNotifSize,
+               let cachedPad = cachedInitialPadding {
+                // Calculate new position as relative offset
+                let newPosition = calculateRelativeOffset(
+                    windowSize: cachedWinSize,
+                    notifSize: cachedNotifSize,
+                    position: cachedPos,
+                    padding: cachedPad
+                )
 
-    /// Reposition all currently visible notifications
-    func repositionAllNotifications() {
-        let banners = findNotificationBanners(verbose: false)
-        for banner in banners {
-            repositionBanner(banner)
+                // Set position directly on the window
+                var point = CGPoint(x: newPosition.x, y: newPosition.y)
+                if let value = AXValueCreate(.cgPoint, &point) {
+                    AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, value)
+                }
+            }
+        }
+
+        // Show custom notification based on rules (always check, regardless of position)
+        let content = CustomNotificationManager.shared.extractContent(from: bannerContainer)
+        if !content.title.isEmpty || !content.body.isEmpty {
+            // Create a content hash for deduplication
+            let contentHash = "\(content.appName)|\(content.title)|\(content.subtitle)|\(content.body)"
+            let now = Date()
+
+            // Clean up old entries
+            recentNotifications.removeAll { now.timeIntervalSince($0.time) > dedupeWindow }
+
+            // Check if we've recently shown this exact notification
+            let isDuplicate = recentNotifications.contains { $0.content == contentHash }
+
+            if !isDuplicate {
+                if let style = RulesManager.shared.styleFor(content: content) {
+                    let config = style.toConfig()
+                    CustomNotificationManager.shared.configure(config)
+                    CustomNotificationManager.shared.showNotification(content: content)
+                    recentNotifications.append((content: contentHash, time: now))
+                }
+            }
         }
     }
-
-    // MARK: - Positioning Logic (single code path)
-
-    /// Reposition a notification banner to the target position
-    private func repositionBanner(_ banner: AXUIElement) {
-        guard let bannerPos = getPosition(of: banner),
-              let bannerSize = getSize(of: banner) else {
-            return
-        }
-
-        guard let screen = NSScreen.main else { return }
-        let screenFrame = screen.frame
-
-        // Calculate target position
-        let targetPoint = calculateTargetPosition(forSize: bannerSize, in: screenFrame)
-
-        // Check if already at target (avoid fighting with system)
-        let tolerance: CGFloat = 5.0
-        if abs(bannerPos.x - targetPoint.x) < tolerance && abs(bannerPos.y - targetPoint.y) < tolerance {
-            return
-        }
-
-        // Get the parent window - that's what we actually move
-        var windowRef: CFTypeRef?
-        let windowResult = AXUIElementCopyAttributeValue(banner, kAXWindowAttribute as CFString, &windowRef)
-        guard windowResult == .success, let window = windowRef else {
-            return
-        }
-        let windowElement = window as! AXUIElement
-
-        guard let windowPos = getPosition(of: windowElement) else {
-            return
-        }
-
-        // Calculate where window needs to be so banner lands at target
-        let bannerOffsetInWindow = CGPoint(
-            x: bannerPos.x - windowPos.x,
-            y: bannerPos.y - windowPos.y
-        )
-
-        let newWindowPos = CGPoint(
-            x: targetPoint.x - bannerOffsetInWindow.x,
-            y: targetPoint.y - bannerOffsetInWindow.y
-        )
-
-        _ = NotifyMeHow.setPosition(of: windowElement, to: newWindowPos)
-    }
-
-    /// Calculate the target screen position for a notification of given size
-    /// Note: Accessibility API uses screen coordinates where Y=0 is at TOP of screen
-    private func calculateTargetPosition(forSize size: CGSize, in screenFrame: CGRect) -> CGPoint {
-        var x: CGFloat
-        var y: CGFloat
-        let screenHeight = screenFrame.height
-
-        // Horizontal position
-        switch targetPosition.corner {
-        case .topRight, .middleRight, .bottomRight:
-            x = screenFrame.maxX - size.width - targetPosition.offsetX
-        case .topLeft, .middleLeft, .bottomLeft:
-            x = screenFrame.minX + targetPosition.offsetX
-        case .topCenter, .center, .bottomCenter:
-            x = screenFrame.midX - size.width / 2
-        }
-
-        // Vertical position (AX coordinates: Y=0 at top)
-        switch targetPosition.corner {
-        case .topLeft, .topCenter, .topRight:
-            y = targetPosition.offsetY
-        case .middleLeft, .center, .middleRight:
-            y = screenHeight / 2 - size.height / 2
-        case .bottomLeft, .bottomCenter, .bottomRight:
-            y = screenHeight - size.height - targetPosition.offsetY
-        }
-
-        return CGPoint(x: x, y: y)
-    }
-
-    // MARK: - Custom Notifications
-
-    private func showCustomNotificationIfNeeded(from banner: AXUIElement) {
-        let content = CustomNotificationManager.shared.extractContent(from: banner)
-        guard !content.title.isEmpty || !content.body.isEmpty else { return }
-
-        // Deduplicate
-        let contentHash = "\(content.appName)|\(content.title)|\(content.subtitle)|\(content.body)"
-        let now = Date()
-
-        recentNotifications.removeAll { now.timeIntervalSince($0.time) > dedupeWindow }
-
-        let isDuplicate = recentNotifications.contains { $0.content == contentHash }
-        guard !isDuplicate else { return }
-
-        // Check rules and show if matched
-        if let style = RulesManager.shared.styleFor(content: content) {
-            let config = style.toConfig()
-            CustomNotificationManager.shared.configure(config)
-            CustomNotificationManager.shared.showNotification(content: content)
-            recentNotifications.append((content: contentHash, time: now))
-        }
-    }
-
-    // MARK: - Helpers
 
     private func findElementWithSubrole(_ root: AXUIElement, targetSubroles: [String]) -> AXUIElement? {
         var subroleRef: CFTypeRef?
@@ -312,5 +277,72 @@ class NotificationMonitor {
             }
         }
         return nil
+    }
+
+    private func cacheInitialNotificationData(windowSize: CGSize, notifSize: CGSize, position: CGPoint) {
+        guard cachedInitialPosition == nil else { return }
+
+        guard let screen = NSScreen.main else { return }
+        let screenWidth = screen.frame.width
+
+        var padding: CGFloat
+        var effectivePosition = position
+
+        if position.x + notifSize.width > screenWidth {
+            padding = 16.0
+            effectivePosition.x = screenWidth - notifSize.width - padding
+        } else {
+            let rightEdge = position.x + notifSize.width
+            padding = screenWidth - rightEdge
+        }
+
+        cachedInitialPosition = effectivePosition
+        cachedInitialWindowSize = windowSize
+        cachedInitialNotifSize = notifSize
+        cachedInitialPadding = padding
+    }
+
+    private func calculateRelativeOffset(
+        windowSize: CGSize,
+        notifSize: CGSize,
+        position: CGPoint,
+        padding: CGFloat
+    ) -> (x: CGFloat, y: CGFloat) {
+        var newX: CGFloat
+        var newY: CGFloat
+
+        guard let screen = NSScreen.main else { return (0, 0) }
+        let dockSize = screen.frame.height - screen.visibleFrame.height
+        let paddingAboveDock: CGFloat = 30
+
+        // Horizontal positioning (relative offset)
+        switch targetPosition.corner {
+        case .topLeft, .middleLeft, .bottomLeft:
+            newX = padding - position.x + targetPosition.offsetX
+        case .topCenter, .center, .bottomCenter:
+            newX = (windowSize.width - notifSize.width) / 2 - position.x
+        case .topRight, .middleRight, .bottomRight:
+            newX = -targetPosition.offsetX  // Negative moves it left from right edge
+        }
+
+        // Vertical positioning (relative offset)
+        switch targetPosition.corner {
+        case .topLeft, .topCenter, .topRight:
+            newY = targetPosition.offsetY
+        case .middleLeft, .center, .middleRight:
+            newY = (windowSize.height - notifSize.height) / 2 - dockSize
+        case .bottomLeft, .bottomCenter, .bottomRight:
+            newY = windowSize.height - notifSize.height - dockSize - paddingAboveDock - targetPosition.offsetY
+        }
+
+        return (newX, newY)
+    }
+
+    func repositionExistingNotifications() {
+        // Get all NotificationCenter windows and reposition them using the same method as new notifications
+        let windows = getNotificationWindows()
+        for window in windows {
+            repositionNotificationWindow(window)
+        }
     }
 }
