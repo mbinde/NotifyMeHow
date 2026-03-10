@@ -138,6 +138,18 @@ class StylesManager {
         notifyChange()
     }
 
+    /// Replace all styles with imported styles (for import functionality)
+    func replaceAllStyles(_ newStyles: [NotificationStyle]) {
+        // Ensure at least one style
+        if newStyles.isEmpty {
+            styles = [NotificationStyle(name: "Default")]
+        } else {
+            styles = newStyles
+        }
+        saveStyles()
+        notifyChange()
+    }
+
     // MARK: - Persistence
 
     private func loadStyles() {

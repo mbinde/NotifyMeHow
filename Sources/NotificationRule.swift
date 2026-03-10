@@ -208,6 +208,12 @@ class RulesManager {
         saveRules()
     }
 
+    /// Replace all rules with imported rules (for import functionality)
+    func replaceAllRules(_ newRules: [NotificationRule]) {
+        rules = newRules
+        saveRules()
+    }
+
     // MARK: - Persistence
 
     private func loadRules() {

@@ -318,33 +318,75 @@ class Settings {
 
     // MARK: - Export/Import
 
-    /// Export settings to JSON data
-    func exportToJSON() -> Data? {
-        let dict: [String: Any] = [
-            "positionCorner": positionCorner.rawValue,
-            "positionOffsetX": positionOffsetX,
-            "positionOffsetY": positionOffsetY,
-            "scaleFactor": scaleFactor,
-            "enableCustomNotification": enableCustomNotification,
-            "customPositionCorner": customPositionCorner.rawValue,
-            "customPositionOffsetX": customPositionOffsetX,
-            "customPositionOffsetY": customPositionOffsetY,
-            "customScale": customScale,
-            "customOpacity": customOpacity,
-            "customDwellTime": customDwellTime,
-            "customColorHex": customColorHex,
-            "customAppColorHex": customAppColorHex,
-            "customTitleColorHex": customTitleColorHex,
-            "customBodyColorHex": customBodyColorHex,
-            "autoStartMonitoring": autoStartMonitoring,
-            "launchAtLogin": launchAtLogin
-        ]
-
-        return try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys])
+    /// Container for full export including settings, styles, and rules
+    struct ExportData: Codable {
+        var version: Int = 1
+        var settings: SettingsExport
+        var styles: [NotificationStyle]
+        var rules: [NotificationRule]
+        var defaultBehavior: String
     }
 
-    /// Import settings from JSON data
+    struct SettingsExport: Codable {
+        var positionCorner: String
+        var positionOffsetX: Double
+        var positionOffsetY: Double
+        var scaleFactor: Double
+        var autoStartMonitoring: Bool
+        var launchAtLogin: Bool
+    }
+
+    /// Export all settings, styles, and rules to JSON data
+    func exportToJSON() -> Data? {
+        let settingsExport = SettingsExport(
+            positionCorner: positionCorner.rawValue,
+            positionOffsetX: Double(positionOffsetX),
+            positionOffsetY: Double(positionOffsetY),
+            scaleFactor: Double(scaleFactor),
+            autoStartMonitoring: autoStartMonitoring,
+            launchAtLogin: launchAtLogin
+        )
+
+        let exportData = ExportData(
+            version: 1,
+            settings: settingsExport,
+            styles: StylesManager.shared.styles,
+            rules: RulesManager.shared.rules,
+            defaultBehavior: RulesManager.shared.defaultBehavior == .noCustom ? "noCustom" : "showCustom"
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try? encoder.encode(exportData)
+    }
+
+    /// Import all settings, styles, and rules from JSON data
     func importFromJSON(_ data: Data) -> Bool {
+        let decoder = JSONDecoder()
+
+        // Try new format first
+        if let exportData = try? decoder.decode(ExportData.self, from: data) {
+            // Import settings
+            if let corner = NotificationPosition.Corner(rawValue: exportData.settings.positionCorner) {
+                positionCorner = corner
+            }
+            positionOffsetX = CGFloat(exportData.settings.positionOffsetX)
+            positionOffsetY = CGFloat(exportData.settings.positionOffsetY)
+            scaleFactor = CGFloat(exportData.settings.scaleFactor)
+            autoStartMonitoring = exportData.settings.autoStartMonitoring
+            launchAtLogin = exportData.settings.launchAtLogin
+
+            // Import styles (replace all)
+            StylesManager.shared.replaceAllStyles(exportData.styles)
+
+            // Import rules (replace all)
+            RulesManager.shared.replaceAllRules(exportData.rules)
+            RulesManager.shared.defaultBehavior = exportData.defaultBehavior == "noCustom" ? .noCustom : .showCustom
+
+            return true
+        }
+
+        // Fall back to old format for backwards compatibility
         guard let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return false
         }
@@ -356,20 +398,6 @@ class Settings {
         if let x = dict["positionOffsetX"] as? Double { positionOffsetX = CGFloat(x) }
         if let y = dict["positionOffsetY"] as? Double { positionOffsetY = CGFloat(y) }
         if let s = dict["scaleFactor"] as? Double { scaleFactor = CGFloat(s) }
-        if let e = dict["enableCustomNotification"] as? Bool { enableCustomNotification = e }
-        if let corner = dict["customPositionCorner"] as? String,
-           let c = NotificationPosition.Corner(rawValue: corner) {
-            customPositionCorner = c
-        }
-        if let x = dict["customPositionOffsetX"] as? Double { customPositionOffsetX = CGFloat(x) }
-        if let y = dict["customPositionOffsetY"] as? Double { customPositionOffsetY = CGFloat(y) }
-        if let s = dict["customScale"] as? Double { customScale = CGFloat(s) }
-        if let o = dict["customOpacity"] as? Double { customOpacity = CGFloat(o) }
-        if let d = dict["customDwellTime"] as? Double { customDwellTime = d }
-        if let c = dict["customColorHex"] as? String { customColorHex = c }
-        if let c = dict["customAppColorHex"] as? String { customAppColorHex = c }
-        if let c = dict["customTitleColorHex"] as? String { customTitleColorHex = c }
-        if let c = dict["customBodyColorHex"] as? String { customBodyColorHex = c }
         if let a = dict["autoStartMonitoring"] as? Bool { autoStartMonitoring = a }
         if let l = dict["launchAtLogin"] as? Bool { launchAtLogin = l }
 
