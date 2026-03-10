@@ -309,6 +309,7 @@ class RuleEditorWindowController: NSWindowController {
     private var customIconPath: String? = nil
     private var bgImageView: NSImageView!
     private var backgroundImagePath: String? = nil
+    private var showAppNameCheckbox: NSButton!
 
     // Track if we're editing a custom style
     private var isCustomStyle = false
@@ -321,7 +322,7 @@ class RuleEditorWindowController: NSWindowController {
         self.onSave = onSave
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 620),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 650),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -506,7 +507,7 @@ class RuleEditorWindowController: NSWindowController {
         secLabel.frame = NSRect(x: padding + 105, y: y, width: 55, height: 22)
         customStyleContainer.addSubview(secLabel)
 
-        y -= 30
+        y -= 35
         let colorsLabel = createLabel("Colors:")
         colorsLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
         customStyleContainer.addSubview(colorsLabel)
@@ -518,38 +519,42 @@ class RuleEditorWindowController: NSWindowController {
         bgColorWell = NSColorWell(frame: NSRect(x: padding + 77, y: y, width: 32, height: 22))
         customStyleContainer.addSubview(bgColorWell)
 
-        let appCLabel = createLabel("App")
-        appCLabel.frame = NSRect(x: padding + 115, y: y, width: 28, height: 22)
-        customStyleContainer.addSubview(appCLabel)
-
-        appColorWell = NSColorWell(frame: NSRect(x: padding + 143, y: y, width: 32, height: 22))
-        customStyleContainer.addSubview(appColorWell)
-
         let titleCLabel = createLabel("Title")
-        titleCLabel.frame = NSRect(x: padding + 181, y: y, width: 30, height: 22)
+        titleCLabel.frame = NSRect(x: padding + 120, y: y, width: 30, height: 22)
         customStyleContainer.addSubview(titleCLabel)
 
-        titleColorWell = NSColorWell(frame: NSRect(x: padding + 213, y: y, width: 32, height: 22))
+        titleColorWell = NSColorWell(frame: NSRect(x: padding + 152, y: y, width: 32, height: 22))
         customStyleContainer.addSubview(titleColorWell)
 
-        // Second row of colors
-        y -= 28
         let subtitleCLabel = createLabel("Subtitle")
-        subtitleCLabel.frame = NSRect(x: padding + 55, y: y, width: 45, height: 22)
+        subtitleCLabel.frame = NSRect(x: padding + 195, y: y, width: 45, height: 22)
         customStyleContainer.addSubview(subtitleCLabel)
 
-        subtitleColorWell = NSColorWell(frame: NSRect(x: padding + 102, y: y, width: 32, height: 22))
+        subtitleColorWell = NSColorWell(frame: NSRect(x: padding + 242, y: y, width: 32, height: 22))
         customStyleContainer.addSubview(subtitleColorWell)
 
         let bodyCLabel = createLabel("Body")
-        bodyCLabel.frame = NSRect(x: padding + 145, y: y, width: 32, height: 22)
+        bodyCLabel.frame = NSRect(x: padding + 285, y: y, width: 32, height: 22)
         customStyleContainer.addSubview(bodyCLabel)
 
-        bodyColorWell = NSColorWell(frame: NSRect(x: padding + 179, y: y, width: 32, height: 22))
+        bodyColorWell = NSColorWell(frame: NSRect(x: padding + 319, y: y, width: 32, height: 22))
         customStyleContainer.addSubview(bodyColorWell)
 
-        // Custom Icon
+        // App name row: checkbox + color
         y -= 35
+        showAppNameCheckbox = NSButton(checkboxWithTitle: "Show app name", target: nil, action: nil)
+        showAppNameCheckbox.frame = NSRect(x: padding, y: y, width: 130, height: 20)
+        customStyleContainer.addSubview(showAppNameCheckbox)
+
+        let appCLabel = createLabel("App Color:")
+        appCLabel.frame = NSRect(x: padding + 140, y: y, width: 65, height: 22)
+        customStyleContainer.addSubview(appCLabel)
+
+        appColorWell = NSColorWell(frame: NSRect(x: padding + 205, y: y, width: 32, height: 22))
+        customStyleContainer.addSubview(appColorWell)
+
+        // Custom Icon
+        y -= 45
         let iconLabel = createLabel("Custom Icon:")
         iconLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
         customStyleContainer.addSubview(iconLabel)
@@ -573,8 +578,14 @@ class RuleEditorWindowController: NSWindowController {
         clearButton.frame = NSRect(x: padding + 225, y: y - 2, width: 60, height: 24)
         customStyleContainer.addSubview(clearButton)
 
+        let iconHint = createLabel("Square recommended (e.g. 128x128)")
+        iconHint.font = NSFont.systemFont(ofSize: 10)
+        iconHint.textColor = .secondaryLabelColor
+        iconHint.frame = NSRect(x: padding + 90, y: y - 30, width: 200, height: 14)
+        customStyleContainer.addSubview(iconHint)
+
         // Background Image
-        y -= 45
+        y -= 60
         let bgImageLabel = createLabel("Background:")
         bgImageLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
         customStyleContainer.addSubview(bgImageLabel)
@@ -597,6 +608,12 @@ class RuleEditorWindowController: NSWindowController {
         clearBgButton.bezelStyle = .rounded
         clearBgButton.frame = NSRect(x: padding + 245, y: y - 2, width: 60, height: 24)
         customStyleContainer.addSubview(clearBgButton)
+
+        let bgHint = createLabel("16:9 or wider recommended")
+        bgHint.font = NSFont.systemFont(ofSize: 10)
+        bgHint.textColor = .secondaryLabelColor
+        bgHint.frame = NSRect(x: padding + 90, y: y - 30, width: 200, height: 14)
+        customStyleContainer.addSubview(bgHint)
 
         // Set defaults
         loadDefaultStyleValues()
@@ -653,6 +670,9 @@ class RuleEditorWindowController: NSWindowController {
         } else {
             bgImageView.image = nil
         }
+
+        // Load show app name setting
+        showAppNameCheckbox.state = style.showAppName ? .on : .off
     }
 
     private func rebuildStylePopup() {
@@ -759,6 +779,7 @@ class RuleEditorWindowController: NSWindowController {
         if hexFromColor(bodyColorWell.color) != original.bodyColorHex { return true }
         if customIconPath != original.customIconPath { return true }
         if backgroundImagePath != original.backgroundImagePath { return true }
+        if (showAppNameCheckbox.state == .on) != original.showAppName { return true }
 
         return false
     }
@@ -779,6 +800,7 @@ class RuleEditorWindowController: NSWindowController {
         style.bodyColorHex = hexFromColor(bodyColorWell.color)
         style.customIconPath = customIconPath
         style.backgroundImagePath = backgroundImagePath
+        style.showAppName = showAppNameCheckbox.state == .on
         return style
     }
 
@@ -787,11 +809,14 @@ class RuleEditorWindowController: NSWindowController {
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.message = "Choose an icon image for this notification style"
+        panel.message = "Choose an icon image (recommended: square, e.g. 128x128)"
 
-        if panel.runModal() == .OK, let url = panel.url {
-            customIconPath = url.path
-            iconImageView.image = NSImage(contentsOf: url)
+        guard let win = window else { return }
+        panel.beginSheetModal(for: win) { [weak self] response in
+            if response == .OK, let url = panel.url {
+                self?.customIconPath = url.path
+                self?.iconImageView.image = NSImage(contentsOf: url)
+            }
         }
     }
 
@@ -805,11 +830,14 @@ class RuleEditorWindowController: NSWindowController {
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.message = "Choose a background image for this notification style"
+        panel.message = "Choose a background image (recommended: 16:9 or wider)"
 
-        if panel.runModal() == .OK, let url = panel.url {
-            backgroundImagePath = url.path
-            bgImageView.image = NSImage(contentsOf: url)
+        guard let win = window else { return }
+        panel.beginSheetModal(for: win) { [weak self] response in
+            if response == .OK, let url = panel.url {
+                self?.backgroundImagePath = url.path
+                self?.bgImageView.image = NSImage(contentsOf: url)
+            }
         }
     }
 

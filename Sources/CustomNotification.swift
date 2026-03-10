@@ -12,7 +12,7 @@ struct CustomNotificationConfig {
     var subtitleFontSize: CGFloat = 13
     var bodyFontSize: CGFloat = 13
     var cornerRadius: CGFloat = 12
-    var padding: CGFloat = 16
+    var padding: CGFloat = 10
     var width: CGFloat = 380
     var maxHeight: CGFloat = 200
     var opacity: CGFloat = 1.0
@@ -23,6 +23,7 @@ struct CustomNotificationConfig {
     var backgroundImage: NSImage? = nil  // Background image instead of solid color
     var maxBodyCharacters: Int = 500  // Max characters for body text (0 = unlimited)
     var maxBodyLines: Int = 4  // Max lines for body text (0 = unlimited)
+    var showAppName: Bool = true  // Whether to show app name label
 }
 
 /// Content extracted from a notification
@@ -226,7 +227,7 @@ class CustomNotificationManager {
         var labels: [NSTextField] = []
 
         // App name (small, at top)
-        if !content.appName.isEmpty {
+        if config.showAppName && !content.appName.isEmpty {
             let appLabel = createLabel(
                 text: content.appName.uppercased(),
                 fontSize: config.subtitleFontSize * config.scaleFactor * 0.8,
@@ -279,7 +280,7 @@ class CustomNotificationManager {
         }
 
         // Calculate total height
-        let spacing: CGFloat = 4
+        let spacing: CGFloat = 2
         var totalHeight = scaledPadding * 2
         for label in labels {
             totalHeight += label.frame.height + spacing
@@ -298,13 +299,7 @@ class CustomNotificationManager {
 
         // Add background - either image or solid color
         if let bgImage = config.backgroundImage {
-            // Use background image with aspect fill
-            let bgImageView = NSImageView(frame: contentView.bounds)
-            bgImageView.image = bgImage
-            bgImageView.imageScaling = .scaleProportionallyUpOrDown
-            bgImageView.autoresizingMask = [.width, .height]
-
-            // For aspect fill, we need to calculate the proper frame
+            // Use background image with aspect fill (scale to fill, crop excess)
             let imageSize = bgImage.size
             let viewSize = contentView.bounds.size
             let imageAspect = imageSize.width / imageSize.height
@@ -312,7 +307,7 @@ class CustomNotificationManager {
 
             var drawRect = contentView.bounds
             if imageAspect > viewAspect {
-                // Image is wider - scale by height, crop width
+                // Image is wider than view - scale by height, crop width
                 let scaledWidth = viewSize.height * imageAspect
                 drawRect = NSRect(
                     x: (viewSize.width - scaledWidth) / 2,
@@ -321,7 +316,7 @@ class CustomNotificationManager {
                     height: viewSize.height
                 )
             } else {
-                // Image is taller - scale by width, crop height
+                // Image is taller than view - scale by width, crop height
                 let scaledHeight = viewSize.width / imageAspect
                 drawRect = NSRect(
                     x: 0,
@@ -330,7 +325,10 @@ class CustomNotificationManager {
                     height: scaledHeight
                 )
             }
-            bgImageView.frame = drawRect
+
+            let bgImageView = NSImageView(frame: drawRect)
+            bgImageView.image = bgImage
+            bgImageView.imageScaling = .scaleAxesIndependently  // Fill the calculated frame
             contentView.addSubview(bgImageView)
 
             // Add a semi-transparent overlay for text readability
@@ -348,18 +346,54 @@ class CustomNotificationManager {
         let displayIcon = config.customIcon ?? content.profileImage ?? content.appIcon
         var iconView: NSImageView? = nil
         if hasIcon, let icon = displayIcon {
-            iconView = NSImageView(frame: NSRect(
+            // Calculate aspect-fill frame for non-square icons
+            let iconFrame = NSRect(
                 x: scaledPadding,
-                y: (windowHeight - iconSize) / 2,  // Vertically centered
+                y: (windowHeight - iconSize) / 2,
                 width: iconSize,
                 height: iconSize
+            )
+
+            let imageSize = icon.size
+            let imageAspect = imageSize.width / imageSize.height
+
+            var imageFrame = iconFrame
+            if imageAspect > 1 {
+                // Image is wider - scale by height, crop width
+                let scaledWidth = iconSize * imageAspect
+                imageFrame = NSRect(
+                    x: iconFrame.origin.x + (iconSize - scaledWidth) / 2,
+                    y: iconFrame.origin.y,
+                    width: scaledWidth,
+                    height: iconSize
+                )
+            } else if imageAspect < 1 {
+                // Image is taller - scale by width, crop height
+                let scaledHeight = iconSize / imageAspect
+                imageFrame = NSRect(
+                    x: iconFrame.origin.x,
+                    y: iconFrame.origin.y + (iconSize - scaledHeight) / 2,
+                    width: iconSize,
+                    height: scaledHeight
+                )
+            }
+
+            // Container view for clipping
+            let iconContainer = NSView(frame: iconFrame)
+            iconContainer.wantsLayer = true
+            iconContainer.layer?.cornerRadius = iconSize / 2  // Circular
+            iconContainer.layer?.masksToBounds = true
+
+            iconView = NSImageView(frame: NSRect(
+                x: imageFrame.origin.x - iconFrame.origin.x,
+                y: imageFrame.origin.y - iconFrame.origin.y,
+                width: imageFrame.width,
+                height: imageFrame.height
             ))
             iconView?.image = icon
-            iconView?.imageScaling = .scaleProportionallyUpOrDown
-            iconView?.wantsLayer = true
-            iconView?.layer?.cornerRadius = iconSize / 2  // Circular
-            iconView?.layer?.masksToBounds = true
-            contentView.addSubview(iconView!)
+            iconView?.imageScaling = .scaleAxesIndependently
+            iconContainer.addSubview(iconView!)
+            contentView.addSubview(iconContainer)
         }
 
         // Position labels from top to bottom (Cocoa coords: y=0 is bottom)

@@ -17,6 +17,7 @@ struct NotificationStyle: Codable, Identifiable {
     var bodyColorHex: String = "DDDDDD"
     var customIconPath: String? = nil           // Path to custom icon image
     var backgroundImagePath: String? = nil      // Path to background image
+    var showAppName: Bool = false                // Whether to show app name label
 
     /// Convert to CustomNotificationConfig
     func toConfig() -> CustomNotificationConfig {
@@ -43,6 +44,8 @@ struct NotificationStyle: Codable, Identifiable {
         if let bgImagePath = backgroundImagePath, !bgImagePath.isEmpty {
             config.backgroundImage = NSImage(contentsOfFile: bgImagePath)
         }
+
+        config.showAppName = showAppName
 
         return config
     }
