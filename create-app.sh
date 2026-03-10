@@ -46,20 +46,14 @@ cat > "${APP_DIR}/Contents/Info.plist" << 'EOF'
     <true/>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>NotifyMeHow needs accessibility permissions to detect and reposition notifications on your screen.</string>
 </dict>
 </plist>
 EOF
 
-# Create a launcher script that runs in GUI mode
-cat > "${APP_DIR}/Contents/MacOS/NotifyMeHow-launcher" << 'EOF'
-#!/bin/bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
-"${DIR}/NotifyMeHow" --gui
-EOF
-chmod +x "${APP_DIR}/Contents/MacOS/NotifyMeHow-launcher"
-
-# Update Info.plist to use the launcher
-sed -i '' 's/<string>NotifyMeHow<\/string>/<string>NotifyMeHow-launcher<\/string>/' "${APP_DIR}/Contents/Info.plist"
+# Add codesign for accessibility permissions to work properly
+codesign -s - --force --deep "${APP_DIR}"
 
 echo ""
 echo "App bundle created: ${APP_DIR}"

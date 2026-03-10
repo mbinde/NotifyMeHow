@@ -1,10 +1,20 @@
 import Cocoa
 import ApplicationServices
 
-// Check if running in GUI mode
+// Check if running in GUI mode (default) vs CLI mode
 func shouldRunGUI() -> Bool {
     let args = CommandLine.arguments
-    return args.contains("--gui") || args.contains("-g")
+    // CLI mode only if specific CLI flags are passed
+    let cliFlags = ["--help", "-h", "--position", "-p", "--scale", "-s",
+                    "--debug", "-d", "--test-hide", "--offset-x", "-ox",
+                    "--offset-y", "-oy", "--custom", "-c"]
+    for arg in args {
+        if cliFlags.contains(arg) {
+            return false
+        }
+    }
+    // Default to GUI mode
+    return true
 }
 
 struct ParsedArgs {

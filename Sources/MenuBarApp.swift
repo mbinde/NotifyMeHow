@@ -34,11 +34,35 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
             object: nil
         )
 
-        // Check permissions and auto-start
-        // checkAccessibilityPermissions() will show system prompt if needed
-        if checkAccessibilityPermissions() && settings.autoStartMonitoring {
+        // Check permissions (will show system prompt if needed)
+        hasPromptedForPermission = true
+        let hasPermissions = checkAccessibilityPermissions()
+
+        // Auto-start if enabled and we have permissions
+        if hasPermissions && settings.autoStartMonitoring {
             startMonitoring()
             rebuildMenu()  // Update menu to show "Running" status
+        } else if !hasPermissions {
+            // Poll for permission grant so we can auto-start once granted
+            waitForAccessibilityPermission()
+        }
+    }
+
+    private var permissionTimer: Timer?
+    private var hasPromptedForPermission = false
+
+    private func waitForAccessibilityPermission() {
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            // Check without prompting
+            if hasAccessibilityPermissions() {
+                timer.invalidate()
+                self?.permissionTimer = nil
+                // Now start monitoring if auto-start is enabled
+                if self?.settings.autoStartMonitoring == true {
+                    self?.startMonitoring()
+                    self?.rebuildMenu()
+                }
+            }
         }
     }
 
@@ -50,8 +74,16 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
         statusMenu.addItem(headerItem)
 
         // Status indicator
+        let hasPerms = hasAccessibilityPermissions()
         let isRunning = monitor != nil
-        let statusText = isRunning ? "Running" : "Stopped"
+        let statusText: String
+        if !hasPerms {
+            statusText = "Needs Permission"
+        } else if isRunning {
+            statusText = "Running"
+        } else {
+            statusText = "Stopped"
+        }
         let statusMenuItem = NSMenuItem(title: "Status: \(statusText)", action: nil, keyEquivalent: "")
         statusMenuItem.tag = 100
         statusMenu.addItem(statusMenuItem)
@@ -101,10 +133,12 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
         prefsItem.target = self
         statusMenu.addItem(prefsItem)
 
-        // Accessibility settings
-        let accessItem = NSMenuItem(title: "Open Accessibility Settings", action: #selector(openAccessibilitySettings(_:)), keyEquivalent: "")
-        accessItem.target = self
-        statusMenu.addItem(accessItem)
+        // Only show accessibility settings link if permissions not granted
+        if !hasAccessibilityPermissions() {
+            let accessItem = NSMenuItem(title: "Grant Accessibility Permission...", action: #selector(openAccessibilitySettings(_:)), keyEquivalent: "")
+            accessItem.target = self
+            statusMenu.addItem(accessItem)
+        }
 
         statusMenu.addItem(NSMenuItem.separator())
 
@@ -164,9 +198,16 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
     }
 
     private func startMonitoring() {
-        // checkAccessibilityPermissions() will show system prompt if needed
-        if !checkAccessibilityPermissions() {
-            return
+        // Only prompt if we haven't already, otherwise just check silently
+        if hasPromptedForPermission {
+            if !hasAccessibilityPermissions() {
+                return
+            }
+        } else {
+            hasPromptedForPermission = true
+            if !checkAccessibilityPermissions() {
+                return
+            }
         }
 
         monitor = NotificationMonitor(position: settings.position, scaleFactor: settings.scaleFactor)
