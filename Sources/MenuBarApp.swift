@@ -233,5 +233,37 @@ func runMenuBarApp() {
     // Hide from dock (menu bar only)
     app.setActivationPolicy(.accessory)
 
+    // Set up main menu with Edit menu for standard keyboard shortcuts (Cmd+A, Cmd+C, etc.)
+    setupMainMenu()
+
     app.run()
+}
+
+/// Set up a minimal main menu with Edit menu for text field keyboard shortcuts
+private func setupMainMenu() {
+    let mainMenu = NSMenu()
+
+    // App menu (required)
+    let appMenuItem = NSMenuItem()
+    let appMenu = NSMenu()
+    appMenu.addItem(NSMenuItem(title: "Quit NotifyMeHow", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+    appMenuItem.submenu = appMenu
+    mainMenu.addItem(appMenuItem)
+
+    // Edit menu (enables Cmd+A, Cmd+C, Cmd+V, Cmd+X in text fields)
+    let editMenuItem = NSMenuItem()
+    let editMenu = NSMenu(title: "Edit")
+
+    editMenu.addItem(NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z"))
+    editMenu.addItem(NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "Z"))
+    editMenu.addItem(NSMenuItem.separator())
+    editMenu.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+    editMenu.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+    editMenu.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+    editMenu.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+
+    editMenuItem.submenu = editMenu
+    mainMenu.addItem(editMenuItem)
+
+    NSApplication.shared.mainMenu = mainMenu
 }
