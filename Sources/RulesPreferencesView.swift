@@ -303,6 +303,7 @@ class RuleEditorWindowController: NSWindowController {
     private var bgColorWell: NSColorWell!
     private var appColorWell: NSColorWell!
     private var titleColorWell: NSColorWell!
+    private var subtitleColorWell: NSColorWell!
     private var bodyColorWell: NSColorWell!
 
     // Track if we're editing a custom style
@@ -316,7 +317,7 @@ class RuleEditorWindowController: NSWindowController {
         self.onSave = onSave
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 480),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 510),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -527,11 +528,20 @@ class RuleEditorWindowController: NSWindowController {
         titleColorWell = NSColorWell(frame: NSRect(x: padding + 213, y: y, width: 32, height: 22))
         customStyleContainer.addSubview(titleColorWell)
 
+        // Second row of colors
+        y -= 28
+        let subtitleCLabel = createLabel("Subtitle")
+        subtitleCLabel.frame = NSRect(x: padding + 55, y: y, width: 45, height: 22)
+        customStyleContainer.addSubview(subtitleCLabel)
+
+        subtitleColorWell = NSColorWell(frame: NSRect(x: padding + 102, y: y, width: 32, height: 22))
+        customStyleContainer.addSubview(subtitleColorWell)
+
         let bodyCLabel = createLabel("Body")
-        bodyCLabel.frame = NSRect(x: padding + 251, y: y, width: 32, height: 22)
+        bodyCLabel.frame = NSRect(x: padding + 145, y: y, width: 32, height: 22)
         customStyleContainer.addSubview(bodyCLabel)
 
-        bodyColorWell = NSColorWell(frame: NSRect(x: padding + 285, y: y, width: 32, height: 22))
+        bodyColorWell = NSColorWell(frame: NSRect(x: padding + 179, y: y, width: 32, height: 22))
         customStyleContainer.addSubview(bodyColorWell)
 
         // Set defaults
@@ -551,6 +561,7 @@ class RuleEditorWindowController: NSWindowController {
         bgColorWell.color = colorFromHex(defaultStyle.backgroundColorHex)
         appColorWell.color = colorFromHex(defaultStyle.appColorHex)
         titleColorWell.color = colorFromHex(defaultStyle.titleColorHex)
+        subtitleColorWell.color = colorFromHex(defaultStyle.subtitleColorHex)
         bodyColorWell.color = colorFromHex(defaultStyle.bodyColorHex)
     }
 
@@ -566,6 +577,7 @@ class RuleEditorWindowController: NSWindowController {
         bgColorWell.color = colorFromHex(style.backgroundColorHex)
         appColorWell.color = colorFromHex(style.appColorHex)
         titleColorWell.color = colorFromHex(style.titleColorHex)
+        subtitleColorWell.color = colorFromHex(style.subtitleColorHex)
         bodyColorWell.color = colorFromHex(style.bodyColorHex)
     }
 
@@ -669,6 +681,7 @@ class RuleEditorWindowController: NSWindowController {
         if hexFromColor(bgColorWell.color) != original.backgroundColorHex { return true }
         if hexFromColor(appColorWell.color) != original.appColorHex { return true }
         if hexFromColor(titleColorWell.color) != original.titleColorHex { return true }
+        if hexFromColor(subtitleColorWell.color) != original.subtitleColorHex { return true }
         if hexFromColor(bodyColorWell.color) != original.bodyColorHex { return true }
 
         return false
@@ -686,6 +699,7 @@ class RuleEditorWindowController: NSWindowController {
         style.backgroundColorHex = hexFromColor(bgColorWell.color)
         style.appColorHex = hexFromColor(appColorWell.color)
         style.titleColorHex = hexFromColor(titleColorWell.color)
+        style.subtitleColorHex = hexFromColor(subtitleColorWell.color)
         style.bodyColorHex = hexFromColor(bodyColorWell.color)
         return style
     }

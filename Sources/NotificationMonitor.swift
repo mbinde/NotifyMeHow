@@ -391,7 +391,7 @@ class NotificationMonitor {
                 y: newY - bannerOffsetInWindow.y
             )
 
-            _ = notifymehow.setPosition(of: windowElement, to: adjustedWindowPos)
+            _ = NotifyMeHow.setPosition(of: windowElement, to: adjustedWindowPos)
             return
         }
 
@@ -401,7 +401,7 @@ class NotificationMonitor {
             return
         }
 
-        _ = notifymehow.setPosition(of: windowElement, to: newPosition)
+        _ = NotifyMeHow.setPosition(of: windowElement, to: newPosition)
     }
 
     private func repositionWindow(_ window: AXUIElement, index: Int) {
@@ -492,7 +492,7 @@ class NotificationMonitor {
 
         // Fall back to accessibility API
         if !moved {
-            if notifymehow.setPosition(of: window, to: newPosition) {
+            if NotifyMeHow.setPosition(of: window, to: newPosition) {
                 print("  [AX] Successfully moved notification window")
             } else {
                 print("  [AX] Failed to move notification window")
@@ -512,7 +512,7 @@ class NotificationMonitor {
         // Approach 1: Try accessibility API size change (usually fails for system windows)
         if let currentSize = getSize(of: window) {
             let newSize = CGSize(width: currentSize.width * scaleFactor, height: currentSize.height * scaleFactor)
-            if notifymehow.setSize(of: window, to: newSize) {
+            if NotifyMeHow.setSize(of: window, to: newSize) {
                 print("  [AX API] Successfully resized notification window")
                 return
             } else {

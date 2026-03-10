@@ -253,6 +253,7 @@ class StyleEditorWindowController: NSWindowController {
     private var bgColorWell: NSColorWell!
     private var appColorWell: NSColorWell!
     private var titleColorWell: NSColorWell!
+    private var subtitleColorWell: NSColorWell!
     private var bodyColorWell: NSColorWell!
 
     init(style: NotificationStyle, onSave: @escaping (NotificationStyle) -> Void) {
@@ -260,7 +261,7 @@ class StyleEditorWindowController: NSWindowController {
         self.onSave = onSave
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 380),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 440),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -405,11 +406,20 @@ class StyleEditorWindowController: NSWindowController {
         titleColorWell = NSColorWell(frame: NSRect(x: padding + 213, y: y, width: 32, height: 22))
         contentView.addSubview(titleColorWell)
 
+        // Second row of colors
+        y -= 28
+        let subtitleCLabel = createLabel("Subtitle")
+        subtitleCLabel.frame = NSRect(x: padding + 55, y: y, width: 45, height: 22)
+        contentView.addSubview(subtitleCLabel)
+
+        subtitleColorWell = NSColorWell(frame: NSRect(x: padding + 102, y: y, width: 32, height: 22))
+        contentView.addSubview(subtitleColorWell)
+
         let bodyCLabel = createLabel("Body")
-        bodyCLabel.frame = NSRect(x: padding + 251, y: y, width: 32, height: 22)
+        bodyCLabel.frame = NSRect(x: padding + 145, y: y, width: 32, height: 22)
         contentView.addSubview(bodyCLabel)
 
-        bodyColorWell = NSColorWell(frame: NSRect(x: padding + 285, y: y, width: 32, height: 22))
+        bodyColorWell = NSColorWell(frame: NSRect(x: padding + 179, y: y, width: 32, height: 22))
         contentView.addSubview(bodyColorWell)
 
         // Buttons
@@ -451,6 +461,7 @@ class StyleEditorWindowController: NSWindowController {
         bgColorWell.color = colorFromHex(style.backgroundColorHex)
         appColorWell.color = colorFromHex(style.appColorHex)
         titleColorWell.color = colorFromHex(style.titleColorHex)
+        subtitleColorWell.color = colorFromHex(style.subtitleColorHex)
         bodyColorWell.color = colorFromHex(style.bodyColorHex)
     }
 
@@ -528,6 +539,7 @@ class StyleEditorWindowController: NSWindowController {
         style.backgroundColorHex = hexFromColor(bgColorWell.color)
         style.appColorHex = hexFromColor(appColorWell.color)
         style.titleColorHex = hexFromColor(titleColorWell.color)
+        style.subtitleColorHex = hexFromColor(subtitleColorWell.color)
         style.bodyColorHex = hexFromColor(bodyColorWell.color)
 
         onSave(style)

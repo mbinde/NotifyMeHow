@@ -10,9 +10,10 @@ struct NotificationStyle: Codable, Identifiable {
     var scale: Double = 1.5
     var opacity: Double = 0.95
     var dwellTime: Double = 5.0
-    var backgroundColorHex: String = "000000"
+    var backgroundColorHex: String = "1A1A1A"
     var appColorHex: String = "AAAAAA"
     var titleColorHex: String = "FFFFFF"
+    var subtitleColorHex: String = "DDDDDD"
     var bodyColorHex: String = "DDDDDD"
 
     /// Convert to CustomNotificationConfig
@@ -28,6 +29,7 @@ struct NotificationStyle: Codable, Identifiable {
         config.backgroundColor = colorFromHex(backgroundColorHex)
         config.appColor = colorFromHex(appColorHex)
         config.titleColor = colorFromHex(titleColorHex)
+        config.subtitleColor = colorFromHex(subtitleColorHex)
         config.bodyColor = colorFromHex(bodyColorHex)
 
         return config
