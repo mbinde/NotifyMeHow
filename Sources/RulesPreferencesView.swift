@@ -20,10 +20,24 @@ class RulesPreferencesView: NSView {
         super.init(frame: frame)
         setupUI()
         loadRules()
+
+        // Listen for style changes to refresh the table
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(stylesDidChange),
+            name: StylesManager.didChangeNotification, object: nil
+        )
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func stylesDidChange() {
+        tableView.reloadData()
     }
 
     private func setupUI() {
@@ -290,26 +304,7 @@ class RuleEditorWindowController: NSWindowController {
     // Style selection
     private var stylePopup: NSPopUpButton!
     private var customStyleContainer: NSView!
-
-    // Custom style controls (shown when "Custom..." is selected)
-    private var positionPopup: NSPopUpButton!
-    private var offsetXField: NSTextField!
-    private var offsetYField: NSTextField!
-    private var scaleSlider: NSSlider!
-    private var scaleLabel: NSTextField!
-    private var opacitySlider: NSSlider!
-    private var opacityLabel: NSTextField!
-    private var dwellField: NSTextField!
-    private var bgColorWell: NSColorWell!
-    private var appColorWell: NSColorWell!
-    private var titleColorWell: NSColorWell!
-    private var subtitleColorWell: NSColorWell!
-    private var bodyColorWell: NSColorWell!
-    private var iconImageView: NSImageView!
-    private var customIconPath: String? = nil
-    private var bgImageView: NSImageView!
-    private var backgroundImagePath: String? = nil
-    private var showAppNameCheckbox: NSButton!
+    private var styleControlsView: StyleControlsView!
 
     // Track if we're editing a custom style
     private var isCustomStyle = false
@@ -322,7 +317,7 @@ class RuleEditorWindowController: NSWindowController {
         self.onSave = onSave
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 650),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 590),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -405,12 +400,15 @@ class RuleEditorWindowController: NSWindowController {
         stylePopup.action = #selector(styleSelectionChanged)
         contentView.addSubview(stylePopup)
 
-        // Custom style container (initially hidden)
+        // Custom style container with StyleControlsView
         y -= 10
         customStyleContainer = NSView(frame: NSRect(x: 0, y: 60, width: contentView.frame.width, height: y - 60))
         contentView.addSubview(customStyleContainer)
 
-        setupCustomStyleControls()
+        styleControlsView = StyleControlsView(frame: NSRect(x: 0, y: 0, width: customStyleContainer.frame.width, height: customStyleContainer.frame.height))
+        styleControlsView.parentWindow = window
+        customStyleContainer.addSubview(styleControlsView)
+
         updateCustomStyleVisibility()
 
         // Buttons (always at bottom)
@@ -427,252 +425,14 @@ class RuleEditorWindowController: NSWindowController {
         contentView.addSubview(saveButton)
     }
 
-    private func setupCustomStyleControls() {
-        let padding: CGFloat = 20
-        var y = customStyleContainer.frame.height - 10
-
-        y -= 28
-        let posLabel = createLabel("Position:")
-        posLabel.frame = NSRect(x: padding, y: y, width: 80, height: 22)
-        customStyleContainer.addSubview(posLabel)
-
-        positionPopup = NSPopUpButton(frame: NSRect(x: padding + 85, y: y, width: 140, height: 26), pullsDown: false)
-        positionPopup.addItems(withTitles: [
-            "Top Left", "Top Center", "Top Right",
-            "Middle Left", "Center", "Middle Right",
-            "Bottom Left", "Bottom Center", "Bottom Right"
-        ])
-        customStyleContainer.addSubview(positionPopup)
-
-        y -= 28
-        let offsetLabel = createLabel("Offset:")
-        offsetLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
-        customStyleContainer.addSubview(offsetLabel)
-
-        let xLabel = createLabel("X:")
-        xLabel.frame = NSRect(x: padding + 55, y: y, width: 20, height: 22)
-        customStyleContainer.addSubview(xLabel)
-
-        offsetXField = NSTextField(frame: NSRect(x: padding + 75, y: y, width: 45, height: 22))
-        customStyleContainer.addSubview(offsetXField)
-
-        let yLabel = createLabel("Y:")
-        yLabel.frame = NSRect(x: padding + 130, y: y, width: 20, height: 22)
-        customStyleContainer.addSubview(yLabel)
-
-        offsetYField = NSTextField(frame: NSRect(x: padding + 150, y: y, width: 45, height: 22))
-        customStyleContainer.addSubview(offsetYField)
-
-        y -= 28
-        let scaleTextLabel = createLabel("Scale:")
-        scaleTextLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
-        customStyleContainer.addSubview(scaleTextLabel)
-
-        scaleSlider = NSSlider(frame: NSRect(x: padding + 55, y: y, width: 150, height: 22))
-        scaleSlider.minValue = 0.5
-        scaleSlider.maxValue = 3.0
-        scaleSlider.target = self
-        scaleSlider.action = #selector(scaleChanged)
-        customStyleContainer.addSubview(scaleSlider)
-
-        scaleLabel = createLabel("1.5x")
-        scaleLabel.frame = NSRect(x: padding + 210, y: y, width: 40, height: 22)
-        customStyleContainer.addSubview(scaleLabel)
-
-        y -= 28
-        let opacityTextLabel = createLabel("Opacity:")
-        opacityTextLabel.frame = NSRect(x: padding, y: y, width: 55, height: 22)
-        customStyleContainer.addSubview(opacityTextLabel)
-
-        opacitySlider = NSSlider(frame: NSRect(x: padding + 55, y: y, width: 150, height: 22))
-        opacitySlider.minValue = 0.1
-        opacitySlider.maxValue = 1.0
-        opacitySlider.target = self
-        opacitySlider.action = #selector(opacityChanged)
-        customStyleContainer.addSubview(opacitySlider)
-
-        opacityLabel = createLabel("95%")
-        opacityLabel.frame = NSRect(x: padding + 210, y: y, width: 40, height: 22)
-        customStyleContainer.addSubview(opacityLabel)
-
-        y -= 28
-        let dwellLabel = createLabel("Display:")
-        dwellLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
-        customStyleContainer.addSubview(dwellLabel)
-
-        dwellField = NSTextField(frame: NSRect(x: padding + 55, y: y, width: 45, height: 22))
-        customStyleContainer.addSubview(dwellField)
-
-        let secLabel = createLabel("seconds")
-        secLabel.frame = NSRect(x: padding + 105, y: y, width: 55, height: 22)
-        customStyleContainer.addSubview(secLabel)
-
-        y -= 35
-        let colorsLabel = createLabel("Colors:")
-        colorsLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
-        customStyleContainer.addSubview(colorsLabel)
-
-        let bgLabel = createLabel("BG")
-        bgLabel.frame = NSRect(x: padding + 55, y: y, width: 22, height: 22)
-        customStyleContainer.addSubview(bgLabel)
-
-        bgColorWell = NSColorWell(frame: NSRect(x: padding + 77, y: y, width: 32, height: 22))
-        customStyleContainer.addSubview(bgColorWell)
-
-        let titleCLabel = createLabel("Title")
-        titleCLabel.frame = NSRect(x: padding + 120, y: y, width: 30, height: 22)
-        customStyleContainer.addSubview(titleCLabel)
-
-        titleColorWell = NSColorWell(frame: NSRect(x: padding + 152, y: y, width: 32, height: 22))
-        customStyleContainer.addSubview(titleColorWell)
-
-        let subtitleCLabel = createLabel("Subtitle")
-        subtitleCLabel.frame = NSRect(x: padding + 195, y: y, width: 45, height: 22)
-        customStyleContainer.addSubview(subtitleCLabel)
-
-        subtitleColorWell = NSColorWell(frame: NSRect(x: padding + 242, y: y, width: 32, height: 22))
-        customStyleContainer.addSubview(subtitleColorWell)
-
-        let bodyCLabel = createLabel("Body")
-        bodyCLabel.frame = NSRect(x: padding + 285, y: y, width: 32, height: 22)
-        customStyleContainer.addSubview(bodyCLabel)
-
-        bodyColorWell = NSColorWell(frame: NSRect(x: padding + 319, y: y, width: 32, height: 22))
-        customStyleContainer.addSubview(bodyColorWell)
-
-        // App name row: checkbox + color
-        y -= 35
-        showAppNameCheckbox = NSButton(checkboxWithTitle: "Show app name", target: nil, action: nil)
-        showAppNameCheckbox.frame = NSRect(x: padding, y: y, width: 130, height: 20)
-        customStyleContainer.addSubview(showAppNameCheckbox)
-
-        let appCLabel = createLabel("App Color:")
-        appCLabel.frame = NSRect(x: padding + 140, y: y, width: 65, height: 22)
-        customStyleContainer.addSubview(appCLabel)
-
-        appColorWell = NSColorWell(frame: NSRect(x: padding + 205, y: y, width: 32, height: 22))
-        customStyleContainer.addSubview(appColorWell)
-
-        // Custom Icon
-        y -= 45
-        let iconLabel = createLabel("Custom Icon:")
-        iconLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
-        customStyleContainer.addSubview(iconLabel)
-
-        iconImageView = NSImageView(frame: NSRect(x: padding + 90, y: y - 10, width: 40, height: 40))
-        iconImageView.imageScaling = .scaleProportionallyUpOrDown
-        iconImageView.wantsLayer = true
-        iconImageView.layer?.cornerRadius = 20
-        iconImageView.layer?.masksToBounds = true
-        iconImageView.layer?.borderWidth = 1
-        iconImageView.layer?.borderColor = NSColor.separatorColor.cgColor
-        customStyleContainer.addSubview(iconImageView)
-
-        let chooseButton = NSButton(title: "Choose...", target: self, action: #selector(chooseIcon))
-        chooseButton.bezelStyle = .rounded
-        chooseButton.frame = NSRect(x: padding + 140, y: y - 2, width: 80, height: 24)
-        customStyleContainer.addSubview(chooseButton)
-
-        let clearButton = NSButton(title: "Clear", target: self, action: #selector(clearIcon))
-        clearButton.bezelStyle = .rounded
-        clearButton.frame = NSRect(x: padding + 225, y: y - 2, width: 60, height: 24)
-        customStyleContainer.addSubview(clearButton)
-
-        let iconHint = createLabel("Square recommended (e.g. 128x128)")
-        iconHint.font = NSFont.systemFont(ofSize: 10)
-        iconHint.textColor = .secondaryLabelColor
-        iconHint.frame = NSRect(x: padding + 90, y: y - 30, width: 200, height: 14)
-        customStyleContainer.addSubview(iconHint)
-
-        // Background Image
-        y -= 60
-        let bgImageLabel = createLabel("Background:")
-        bgImageLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
-        customStyleContainer.addSubview(bgImageLabel)
-
-        bgImageView = NSImageView(frame: NSRect(x: padding + 90, y: y - 10, width: 60, height: 40))
-        bgImageView.imageScaling = .scaleProportionallyUpOrDown
-        bgImageView.wantsLayer = true
-        bgImageView.layer?.cornerRadius = 4
-        bgImageView.layer?.masksToBounds = true
-        bgImageView.layer?.borderWidth = 1
-        bgImageView.layer?.borderColor = NSColor.separatorColor.cgColor
-        customStyleContainer.addSubview(bgImageView)
-
-        let chooseBgButton = NSButton(title: "Choose...", target: self, action: #selector(chooseBackgroundImage))
-        chooseBgButton.bezelStyle = .rounded
-        chooseBgButton.frame = NSRect(x: padding + 160, y: y - 2, width: 80, height: 24)
-        customStyleContainer.addSubview(chooseBgButton)
-
-        let clearBgButton = NSButton(title: "Clear", target: self, action: #selector(clearBackgroundImage))
-        clearBgButton.bezelStyle = .rounded
-        clearBgButton.frame = NSRect(x: padding + 245, y: y - 2, width: 60, height: 24)
-        customStyleContainer.addSubview(clearBgButton)
-
-        let bgHint = createLabel("16:9 or wider recommended")
-        bgHint.font = NSFont.systemFont(ofSize: 10)
-        bgHint.textColor = .secondaryLabelColor
-        bgHint.frame = NSRect(x: padding + 90, y: y - 30, width: 200, height: 14)
-        customStyleContainer.addSubview(bgHint)
-
-        // Set defaults
-        loadDefaultStyleValues()
-    }
-
-    private func loadDefaultStyleValues() {
-        let defaultStyle = NotificationStyle()
-        positionPopup.selectItem(at: cornerToIndex(defaultStyle.position))
-        offsetXField.stringValue = String(Int(defaultStyle.offsetX))
-        offsetYField.stringValue = String(Int(defaultStyle.offsetY))
-        scaleSlider.doubleValue = defaultStyle.scale
-        scaleLabel.stringValue = String(format: "%.1fx", defaultStyle.scale)
-        opacitySlider.doubleValue = defaultStyle.opacity
-        opacityLabel.stringValue = String(format: "%.0f%%", defaultStyle.opacity * 100)
-        dwellField.stringValue = String(Int(defaultStyle.dwellTime))
-        bgColorWell.color = colorFromHex(defaultStyle.backgroundColorHex)
-        appColorWell.color = colorFromHex(defaultStyle.appColorHex)
-        titleColorWell.color = colorFromHex(defaultStyle.titleColorHex)
-        subtitleColorWell.color = colorFromHex(defaultStyle.subtitleColorHex)
-        bodyColorWell.color = colorFromHex(defaultStyle.bodyColorHex)
-        customIconPath = nil
-        iconImageView.image = nil
-        backgroundImagePath = nil
-        bgImageView.image = nil
-    }
-
-    private func loadStyleValues(_ style: NotificationStyle) {
-        positionPopup.selectItem(at: cornerToIndex(style.position))
-        offsetXField.stringValue = String(Int(style.offsetX))
-        offsetYField.stringValue = String(Int(style.offsetY))
-        scaleSlider.doubleValue = style.scale
-        scaleLabel.stringValue = String(format: "%.1fx", style.scale)
-        opacitySlider.doubleValue = style.opacity
-        opacityLabel.stringValue = String(format: "%.0f%%", style.opacity * 100)
-        dwellField.stringValue = String(Int(style.dwellTime))
-        bgColorWell.color = colorFromHex(style.backgroundColorHex)
-        appColorWell.color = colorFromHex(style.appColorHex)
-        titleColorWell.color = colorFromHex(style.titleColorHex)
-        subtitleColorWell.color = colorFromHex(style.subtitleColorHex)
-        bodyColorWell.color = colorFromHex(style.bodyColorHex)
-
-        // Load custom icon
-        customIconPath = style.customIconPath
-        if let path = customIconPath, !path.isEmpty {
-            iconImageView.image = NSImage(contentsOfFile: path)
-        } else {
-            iconImageView.image = nil
-        }
-
-        // Load background image
-        backgroundImagePath = style.backgroundImagePath
-        if let path = backgroundImagePath, !path.isEmpty {
-            bgImageView.image = NSImage(contentsOfFile: path)
-        } else {
-            bgImageView.image = nil
-        }
-
-        // Load show app name setting
-        showAppNameCheckbox.state = style.showAppName ? .on : .off
+    private func createLabel(_ text: String, bold: Bool = false) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.font = bold ? NSFont.boldSystemFont(ofSize: 12) : NSFont.systemFont(ofSize: 12)
+        label.isBezeled = false
+        label.drawsBackground = false
+        label.isEditable = false
+        label.isSelectable = false
+        return label
     }
 
     private func rebuildStylePopup() {
@@ -694,16 +454,6 @@ class RuleEditorWindowController: NSWindowController {
         stylePopup.addItem(withTitle: "Custom...")
     }
 
-    private func createLabel(_ text: String, bold: Bool = false) -> NSTextField {
-        let label = NSTextField(labelWithString: text)
-        label.font = bold ? NSFont.boldSystemFont(ofSize: 12) : NSFont.systemFont(ofSize: 12)
-        label.isBezeled = false
-        label.drawsBackground = false
-        label.isEditable = false
-        label.isSelectable = false
-        return label
-    }
-
     private func loadRule() {
         nameField.stringValue = rule.name
 
@@ -720,8 +470,8 @@ class RuleEditorWindowController: NSWindowController {
                 stylePopup.selectItem(at: index + 2)  // +2 for "No custom" and separator
             }
             editingStyle = style
-            loadStyleValues(style)
-            isCustomStyle = true  // Show editor for existing style
+            styleControlsView.style = style
+            isCustomStyle = true
         } else {
             // No style - select "No custom notification"
             stylePopup.selectItem(at: 0)
@@ -743,15 +493,15 @@ class RuleEditorWindowController: NSWindowController {
             // "Custom..." - creating a brand new style
             isCustomStyle = true
             editingStyle = nil
-            loadDefaultStyleValues()
+            styleControlsView.style = NotificationStyle()
         } else {
             // A saved style (accounting for separator) - allow editing
             let styleIndex = selectedIndex - 2
             if styleIndex >= 0 && styleIndex < StylesManager.shared.styles.count {
                 let style = StylesManager.shared.styles[styleIndex]
                 editingStyle = style
-                loadStyleValues(style)
-                isCustomStyle = true  // Show the editor so they can tweak it
+                styleControlsView.style = style
+                isCustomStyle = true
             }
         }
 
@@ -766,142 +516,26 @@ class RuleEditorWindowController: NSWindowController {
     private func styleWasModified() -> Bool {
         guard let original = editingStyle else { return true }  // New style = always "modified"
 
-        if indexToCorner(positionPopup.indexOfSelectedItem) != original.position { return true }
-        if (Double(offsetXField.stringValue) ?? 20) != original.offsetX { return true }
-        if (Double(offsetYField.stringValue) ?? 20) != original.offsetY { return true }
-        if scaleSlider.doubleValue != original.scale { return true }
-        if opacitySlider.doubleValue != original.opacity { return true }
-        if (Double(dwellField.stringValue) ?? 5) != original.dwellTime { return true }
-        if hexFromColor(bgColorWell.color) != original.backgroundColorHex { return true }
-        if hexFromColor(appColorWell.color) != original.appColorHex { return true }
-        if hexFromColor(titleColorWell.color) != original.titleColorHex { return true }
-        if hexFromColor(subtitleColorWell.color) != original.subtitleColorHex { return true }
-        if hexFromColor(bodyColorWell.color) != original.bodyColorHex { return true }
-        if customIconPath != original.customIconPath { return true }
-        if backgroundImagePath != original.backgroundImagePath { return true }
-        if (showAppNameCheckbox.state == .on) != original.showAppName { return true }
+        let current = styleControlsView.style
+        if current.position != original.position { return true }
+        if current.offsetX != original.offsetX { return true }
+        if current.offsetY != original.offsetY { return true }
+        if current.scale != original.scale { return true }
+        if current.opacity != original.opacity { return true }
+        if current.dwellTime != original.dwellTime { return true }
+        if current.backgroundColorHex != original.backgroundColorHex { return true }
+        if current.appColorHex != original.appColorHex { return true }
+        if current.titleColorHex != original.titleColorHex { return true }
+        if current.subtitleColorHex != original.subtitleColorHex { return true }
+        if current.bodyColorHex != original.bodyColorHex { return true }
+        if current.customIconPath != original.customIconPath { return true }
+        if current.backgroundImagePath != original.backgroundImagePath { return true }
+        if current.showAppName != original.showAppName { return true }
+        if current.borderWidth != original.borderWidth { return true }
+        if current.borderColorHex != original.borderColorHex { return true }
+        if current.animation != original.animation { return true }
 
         return false
-    }
-
-    /// Build a NotificationStyle from the current form values
-    private func buildStyleFromForm() -> NotificationStyle {
-        var style = editingStyle ?? NotificationStyle()
-        style.position = indexToCorner(positionPopup.indexOfSelectedItem)
-        style.offsetX = Double(offsetXField.stringValue) ?? 20
-        style.offsetY = Double(offsetYField.stringValue) ?? 20
-        style.scale = scaleSlider.doubleValue
-        style.opacity = opacitySlider.doubleValue
-        style.dwellTime = Double(dwellField.stringValue) ?? 5
-        style.backgroundColorHex = hexFromColor(bgColorWell.color)
-        style.appColorHex = hexFromColor(appColorWell.color)
-        style.titleColorHex = hexFromColor(titleColorWell.color)
-        style.subtitleColorHex = hexFromColor(subtitleColorWell.color)
-        style.bodyColorHex = hexFromColor(bodyColorWell.color)
-        style.customIconPath = customIconPath
-        style.backgroundImagePath = backgroundImagePath
-        style.showAppName = showAppNameCheckbox.state == .on
-        return style
-    }
-
-    @objc private func chooseIcon() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Choose an icon image (recommended: square, e.g. 128x128)"
-
-        guard let win = window else { return }
-        panel.beginSheetModal(for: win) { [weak self] response in
-            if response == .OK, let url = panel.url {
-                self?.customIconPath = url.path
-                self?.iconImageView.image = NSImage(contentsOf: url)
-            }
-        }
-    }
-
-    @objc private func clearIcon() {
-        customIconPath = nil
-        iconImageView.image = nil
-    }
-
-    @objc private func chooseBackgroundImage() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Choose a background image (recommended: 16:9 or wider)"
-
-        guard let win = window else { return }
-        panel.beginSheetModal(for: win) { [weak self] response in
-            if response == .OK, let url = panel.url {
-                self?.backgroundImagePath = url.path
-                self?.bgImageView.image = NSImage(contentsOf: url)
-            }
-        }
-    }
-
-    @objc private func clearBackgroundImage() {
-        backgroundImagePath = nil
-        bgImageView.image = nil
-    }
-
-    private func cornerToIndex(_ corner: String) -> Int {
-        switch corner {
-        case "topLeft": return 0
-        case "topCenter": return 1
-        case "topRight": return 2
-        case "middleLeft": return 3
-        case "center": return 4
-        case "middleRight": return 5
-        case "bottomLeft": return 6
-        case "bottomCenter": return 7
-        case "bottomRight": return 8
-        default: return 6
-        }
-    }
-
-    private func indexToCorner(_ index: Int) -> String {
-        switch index {
-        case 0: return "topLeft"
-        case 1: return "topCenter"
-        case 2: return "topRight"
-        case 3: return "middleLeft"
-        case 4: return "center"
-        case 5: return "middleRight"
-        case 6: return "bottomLeft"
-        case 7: return "bottomCenter"
-        case 8: return "bottomRight"
-        default: return "bottomLeft"
-        }
-    }
-
-    private func colorFromHex(_ hex: String) -> NSColor {
-        let cleanHex = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        guard cleanHex.count == 6 else { return .black }
-
-        var rgb: UInt64 = 0
-        Scanner(string: cleanHex).scanHexInt64(&rgb)
-        let r = CGFloat((rgb >> 16) & 0xFF) / 255.0
-        let g = CGFloat((rgb >> 8) & 0xFF) / 255.0
-        let b = CGFloat(rgb & 0xFF) / 255.0
-        return NSColor(red: r, green: g, blue: b, alpha: 1.0)
-    }
-
-    private func hexFromColor(_ color: NSColor) -> String {
-        guard let rgbColor = color.usingColorSpace(.sRGB) else { return "000000" }
-        let r = Int(rgbColor.redComponent * 255)
-        let g = Int(rgbColor.greenComponent * 255)
-        let b = Int(rgbColor.blueComponent * 255)
-        return String(format: "%02X%02X%02X", r, g, b)
-    }
-
-    @objc private func scaleChanged() {
-        scaleLabel.stringValue = String(format: "%.1fx", scaleSlider.doubleValue)
-    }
-
-    @objc private func opacityChanged() {
-        opacityLabel.stringValue = String(format: "%.0f%%", opacitySlider.doubleValue * 100)
     }
 
     @objc private func cancel() {
@@ -926,7 +560,7 @@ class RuleEditorWindowController: NSWindowController {
             finalizeSave()
         } else if selectedIndex == lastIndex {
             // "Custom..." - create a new style and save it
-            var newStyle = buildStyleFromForm()
+            var newStyle = styleControlsView.style
             newStyle.id = UUID()  // Ensure new ID
             newStyle.name = generateUniqueStyleName()
             StylesManager.shared.addStyle(newStyle)
@@ -954,7 +588,7 @@ class RuleEditorWindowController: NSWindowController {
 
             if otherRulesCount == 0 {
                 // Only this rule uses it - just update the style
-                var updatedStyle = buildStyleFromForm()
+                var updatedStyle = styleControlsView.style
                 updatedStyle.id = originalStyle.id
                 updatedStyle.name = originalStyle.name
                 StylesManager.shared.updateStyle(updatedStyle)
@@ -972,14 +606,14 @@ class RuleEditorWindowController: NSWindowController {
                 let response = alert.runModal()
                 if response == .alertFirstButtonReturn {
                     // Update all - modify the shared style
-                    var updatedStyle = buildStyleFromForm()
+                    var updatedStyle = styleControlsView.style
                     updatedStyle.id = originalStyle.id
                     updatedStyle.name = originalStyle.name
                     StylesManager.shared.updateStyle(updatedStyle)
                     finalizeSave()
                 } else if response == .alertSecondButtonReturn {
                     // Save as new style
-                    var newStyle = buildStyleFromForm()
+                    var newStyle = styleControlsView.style
                     newStyle.id = UUID()
                     newStyle.name = generateUniqueStyleName()
                     StylesManager.shared.addStyle(newStyle)

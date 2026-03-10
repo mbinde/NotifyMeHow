@@ -18,6 +18,9 @@ struct NotificationStyle: Codable, Identifiable {
     var customIconPath: String? = nil           // Path to custom icon image
     var backgroundImagePath: String? = nil      // Path to background image
     var showAppName: Bool = false                // Whether to show app name label
+    var borderWidth: Double = 0                  // Border width (0 = none)
+    var borderColorHex: String = "FFFFFF"        // Border color
+    var animation: String = "none"               // Animation type: none, pulse, jiggle, bounce
 
     /// Convert to CustomNotificationConfig
     func toConfig() -> CustomNotificationConfig {
@@ -46,6 +49,9 @@ struct NotificationStyle: Codable, Identifiable {
         }
 
         config.showAppName = showAppName
+        config.borderWidth = CGFloat(borderWidth)
+        config.borderColor = colorFromHex(borderColorHex)
+        config.animation = animation
 
         return config
     }

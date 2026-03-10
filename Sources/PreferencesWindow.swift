@@ -23,6 +23,7 @@ class PreferencesWindowController: NSWindowController {
         // Create tab view
         let tabView = NSTabView(frame: NSRect(x: 0, y: 0, width: 480, height: 320))
         tabView.autoresizingMask = [.width, .height]
+        window.initialFirstResponder = tabView
 
         // General tab
         let generalItem = NSTabViewItem(identifier: "general")
@@ -58,6 +59,12 @@ class PreferencesWindowController: NSWindowController {
         stylesTab?.loadStyles()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // Prevent auto-focus on first text field (avoids jarring selection animation)
+        // Delay slightly so it happens after the window finishes setting up
+        DispatchQueue.main.async {
+            self.window?.makeFirstResponder(self.window?.contentView)
+        }
     }
 }
 

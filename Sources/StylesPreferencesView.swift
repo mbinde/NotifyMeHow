@@ -242,31 +242,14 @@ class StyleEditorWindowController: NSWindowController {
     private var onSave: (NotificationStyle) -> Void
 
     private var nameField: NSTextField!
-    private var positionPopup: NSPopUpButton!
-    private var offsetXField: NSTextField!
-    private var offsetYField: NSTextField!
-    private var scaleSlider: NSSlider!
-    private var scaleLabel: NSTextField!
-    private var opacitySlider: NSSlider!
-    private var opacityLabel: NSTextField!
-    private var dwellField: NSTextField!
-    private var bgColorWell: NSColorWell!
-    private var appColorWell: NSColorWell!
-    private var titleColorWell: NSColorWell!
-    private var subtitleColorWell: NSColorWell!
-    private var bodyColorWell: NSColorWell!
-    private var iconImageView: NSImageView!
-    private var customIconPath: String? = nil
-    private var bgImageView: NSImageView!
-    private var backgroundImagePath: String? = nil
-    private var showAppNameCheckbox: NSButton!
+    private var styleControlsView: StyleControlsView!
 
     init(style: NotificationStyle, onSave: @escaping (NotificationStyle) -> Void) {
         self.style = style
         self.onSave = onSave
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 550),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 540),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -288,367 +271,38 @@ class StyleEditorWindowController: NSWindowController {
         guard let contentView = window?.contentView else { return }
 
         let padding: CGFloat = 20
-        var y = contentView.frame.height - padding
 
-        // Style Name
-        y -= 25
-        let nameLabel = createLabel("Style Name:", bold: true)
-        nameLabel.frame = NSRect(x: padding, y: y, width: 100, height: 22)
+        // Style Name at top
+        let nameLabel = NSTextField(labelWithString: "Style Name:")
+        nameLabel.font = NSFont.boldSystemFont(ofSize: 12)
+        nameLabel.frame = NSRect(x: padding, y: contentView.frame.height - 35, width: 100, height: 22)
         contentView.addSubview(nameLabel)
 
-        nameField = NSTextField(frame: NSRect(x: padding + 100, y: y, width: 260, height: 22))
+        nameField = NSTextField(frame: NSRect(x: padding + 100, y: contentView.frame.height - 35, width: 260, height: 22))
         contentView.addSubview(nameField)
 
-        // Position
-        y -= 35
-        let posLabel = createLabel("Position:")
-        posLabel.frame = NSRect(x: padding, y: y, width: 80, height: 22)
-        contentView.addSubview(posLabel)
+        // Style controls view (all the shared controls)
+        styleControlsView = StyleControlsView(frame: NSRect(x: 0, y: 60, width: contentView.frame.width, height: contentView.frame.height - 110))
+        styleControlsView.parentWindow = window
+        contentView.addSubview(styleControlsView)
 
-        positionPopup = NSPopUpButton(frame: NSRect(x: padding + 85, y: y, width: 140, height: 26), pullsDown: false)
-        positionPopup.addItems(withTitles: [
-            "Top Left", "Top Center", "Top Right",
-            "Middle Left", "Center", "Middle Right",
-            "Bottom Left", "Bottom Center", "Bottom Right"
-        ])
-        contentView.addSubview(positionPopup)
-
-        // Offset
-        y -= 30
-        let offsetLabel = createLabel("Offset:")
-        offsetLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
-        contentView.addSubview(offsetLabel)
-
-        let xLabel = createLabel("X:")
-        xLabel.frame = NSRect(x: padding + 55, y: y, width: 20, height: 22)
-        contentView.addSubview(xLabel)
-
-        offsetXField = NSTextField(frame: NSRect(x: padding + 75, y: y, width: 45, height: 22))
-        contentView.addSubview(offsetXField)
-
-        let yLabel = createLabel("Y:")
-        yLabel.frame = NSRect(x: padding + 130, y: y, width: 20, height: 22)
-        contentView.addSubview(yLabel)
-
-        offsetYField = NSTextField(frame: NSRect(x: padding + 150, y: y, width: 45, height: 22))
-        contentView.addSubview(offsetYField)
-
-        let pxLabel = createLabel("px")
-        pxLabel.frame = NSRect(x: padding + 200, y: y, width: 20, height: 22)
-        contentView.addSubview(pxLabel)
-
-        // Scale
-        y -= 30
-        let scaleTextLabel = createLabel("Scale:")
-        scaleTextLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
-        contentView.addSubview(scaleTextLabel)
-
-        scaleSlider = NSSlider(frame: NSRect(x: padding + 55, y: y, width: 180, height: 22))
-        scaleSlider.minValue = 0.5
-        scaleSlider.maxValue = 3.0
-        scaleSlider.target = self
-        scaleSlider.action = #selector(scaleChanged)
-        contentView.addSubview(scaleSlider)
-
-        scaleLabel = createLabel("1.5x")
-        scaleLabel.frame = NSRect(x: padding + 240, y: y, width: 40, height: 22)
-        contentView.addSubview(scaleLabel)
-
-        // Opacity
-        y -= 30
-        let opacityTextLabel = createLabel("Opacity:")
-        opacityTextLabel.frame = NSRect(x: padding, y: y, width: 55, height: 22)
-        contentView.addSubview(opacityTextLabel)
-
-        opacitySlider = NSSlider(frame: NSRect(x: padding + 55, y: y, width: 180, height: 22))
-        opacitySlider.minValue = 0.1
-        opacitySlider.maxValue = 1.0
-        opacitySlider.target = self
-        opacitySlider.action = #selector(opacityChanged)
-        contentView.addSubview(opacitySlider)
-
-        opacityLabel = createLabel("95%")
-        opacityLabel.frame = NSRect(x: padding + 240, y: y, width: 40, height: 22)
-        contentView.addSubview(opacityLabel)
-
-        // Display time
-        y -= 30
-        let dwellLabel = createLabel("Display:")
-        dwellLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
-        contentView.addSubview(dwellLabel)
-
-        dwellField = NSTextField(frame: NSRect(x: padding + 55, y: y, width: 45, height: 22))
-        contentView.addSubview(dwellField)
-
-        let secLabel = createLabel("seconds")
-        secLabel.frame = NSRect(x: padding + 105, y: y, width: 55, height: 22)
-        contentView.addSubview(secLabel)
-
-        // Colors
-        y -= 35
-        let colorsLabel = createLabel("Colors:")
-        colorsLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
-        contentView.addSubview(colorsLabel)
-
-        let bgLabel = createLabel("BG")
-        bgLabel.frame = NSRect(x: padding + 55, y: y, width: 22, height: 22)
-        contentView.addSubview(bgLabel)
-
-        bgColorWell = NSColorWell(frame: NSRect(x: padding + 77, y: y, width: 32, height: 22))
-        contentView.addSubview(bgColorWell)
-
-        let titleCLabel = createLabel("Title")
-        titleCLabel.frame = NSRect(x: padding + 120, y: y, width: 30, height: 22)
-        contentView.addSubview(titleCLabel)
-
-        titleColorWell = NSColorWell(frame: NSRect(x: padding + 152, y: y, width: 32, height: 22))
-        contentView.addSubview(titleColorWell)
-
-        let subtitleCLabel = createLabel("Subtitle")
-        subtitleCLabel.frame = NSRect(x: padding + 195, y: y, width: 45, height: 22)
-        contentView.addSubview(subtitleCLabel)
-
-        subtitleColorWell = NSColorWell(frame: NSRect(x: padding + 242, y: y, width: 32, height: 22))
-        contentView.addSubview(subtitleColorWell)
-
-        let bodyCLabel = createLabel("Body")
-        bodyCLabel.frame = NSRect(x: padding + 285, y: y, width: 32, height: 22)
-        contentView.addSubview(bodyCLabel)
-
-        bodyColorWell = NSColorWell(frame: NSRect(x: padding + 319, y: y, width: 32, height: 22))
-        contentView.addSubview(bodyColorWell)
-
-        // App name row: checkbox + color
-        y -= 35
-        showAppNameCheckbox = NSButton(checkboxWithTitle: "Show app name", target: nil, action: nil)
-        showAppNameCheckbox.frame = NSRect(x: padding, y: y, width: 130, height: 20)
-        contentView.addSubview(showAppNameCheckbox)
-
-        let appCLabel = createLabel("App Color:")
-        appCLabel.frame = NSRect(x: padding + 140, y: y, width: 65, height: 22)
-        contentView.addSubview(appCLabel)
-
-        appColorWell = NSColorWell(frame: NSRect(x: padding + 205, y: y, width: 32, height: 22))
-        contentView.addSubview(appColorWell)
-
-        // Custom Icon
-        y -= 45
-        let iconLabel = createLabel("Custom Icon:")
-        iconLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
-        contentView.addSubview(iconLabel)
-
-        iconImageView = NSImageView(frame: NSRect(x: padding + 90, y: y - 10, width: 40, height: 40))
-        iconImageView.imageScaling = .scaleProportionallyUpOrDown
-        iconImageView.wantsLayer = true
-        iconImageView.layer?.cornerRadius = 20
-        iconImageView.layer?.masksToBounds = true
-        iconImageView.layer?.borderWidth = 1
-        iconImageView.layer?.borderColor = NSColor.separatorColor.cgColor
-        contentView.addSubview(iconImageView)
-
-        let chooseButton = NSButton(title: "Choose...", target: self, action: #selector(chooseIcon))
-        chooseButton.bezelStyle = .rounded
-        chooseButton.frame = NSRect(x: padding + 140, y: y - 2, width: 80, height: 24)
-        contentView.addSubview(chooseButton)
-
-        let clearButton = NSButton(title: "Clear", target: self, action: #selector(clearIcon))
-        clearButton.bezelStyle = .rounded
-        clearButton.frame = NSRect(x: padding + 225, y: y - 2, width: 60, height: 24)
-        contentView.addSubview(clearButton)
-
-        let iconHint = createLabel("Square recommended (e.g. 128x128)")
-        iconHint.font = NSFont.systemFont(ofSize: 10)
-        iconHint.textColor = .secondaryLabelColor
-        iconHint.frame = NSRect(x: padding + 90, y: y - 30, width: 200, height: 14)
-        contentView.addSubview(iconHint)
-
-        // Background Image
-        y -= 60
-        let bgImageLabel = createLabel("Background:")
-        bgImageLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
-        contentView.addSubview(bgImageLabel)
-
-        bgImageView = NSImageView(frame: NSRect(x: padding + 90, y: y - 10, width: 60, height: 40))
-        bgImageView.imageScaling = .scaleProportionallyUpOrDown
-        bgImageView.wantsLayer = true
-        bgImageView.layer?.cornerRadius = 4
-        bgImageView.layer?.masksToBounds = true
-        bgImageView.layer?.borderWidth = 1
-        bgImageView.layer?.borderColor = NSColor.separatorColor.cgColor
-        contentView.addSubview(bgImageView)
-
-        let chooseBgButton = NSButton(title: "Choose...", target: self, action: #selector(chooseBackgroundImage))
-        chooseBgButton.bezelStyle = .rounded
-        chooseBgButton.frame = NSRect(x: padding + 160, y: y - 2, width: 80, height: 24)
-        contentView.addSubview(chooseBgButton)
-
-        let clearBgButton = NSButton(title: "Clear", target: self, action: #selector(clearBackgroundImage))
-        clearBgButton.bezelStyle = .rounded
-        clearBgButton.frame = NSRect(x: padding + 245, y: y - 2, width: 60, height: 24)
-        contentView.addSubview(clearBgButton)
-
-        let bgHint = createLabel("16:9 or wider recommended")
-        bgHint.font = NSFont.systemFont(ofSize: 10)
-        bgHint.textColor = .secondaryLabelColor
-        bgHint.frame = NSRect(x: padding + 90, y: y - 30, width: 200, height: 14)
-        contentView.addSubview(bgHint)
-
-        // Buttons
-        y -= 55
+        // Buttons at bottom
         let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancel))
         cancelButton.bezelStyle = .rounded
-        cancelButton.frame = NSRect(x: contentView.frame.width - padding - 170, y: y, width: 80, height: 28)
+        cancelButton.frame = NSRect(x: contentView.frame.width - padding - 170, y: 20, width: 80, height: 28)
         cancelButton.keyEquivalent = "\u{1b}"
         contentView.addSubview(cancelButton)
 
         let saveButton = NSButton(title: "Save", target: self, action: #selector(save))
         saveButton.bezelStyle = .rounded
-        saveButton.frame = NSRect(x: contentView.frame.width - padding - 80, y: y, width: 80, height: 28)
+        saveButton.frame = NSRect(x: contentView.frame.width - padding - 80, y: 20, width: 80, height: 28)
         saveButton.keyEquivalent = "\r"
         contentView.addSubview(saveButton)
     }
 
-    private func createLabel(_ text: String, bold: Bool = false) -> NSTextField {
-        let label = NSTextField(labelWithString: text)
-        label.font = bold ? NSFont.boldSystemFont(ofSize: 12) : NSFont.systemFont(ofSize: 12)
-        label.isBezeled = false
-        label.drawsBackground = false
-        label.isEditable = false
-        label.isSelectable = false
-        return label
-    }
-
     private func loadStyle() {
         nameField.stringValue = style.name
-        positionPopup.selectItem(at: cornerToIndex(style.position))
-        offsetXField.stringValue = String(Int(style.offsetX))
-        offsetYField.stringValue = String(Int(style.offsetY))
-        scaleSlider.doubleValue = style.scale
-        scaleLabel.stringValue = String(format: "%.1fx", style.scale)
-        opacitySlider.doubleValue = style.opacity
-        opacityLabel.stringValue = String(format: "%.0f%%", style.opacity * 100)
-        dwellField.stringValue = String(Int(style.dwellTime))
-
-        bgColorWell.color = colorFromHex(style.backgroundColorHex)
-        appColorWell.color = colorFromHex(style.appColorHex)
-        titleColorWell.color = colorFromHex(style.titleColorHex)
-        subtitleColorWell.color = colorFromHex(style.subtitleColorHex)
-        bodyColorWell.color = colorFromHex(style.bodyColorHex)
-
-        // Load custom icon
-        customIconPath = style.customIconPath
-        if let path = customIconPath, !path.isEmpty {
-            iconImageView.image = NSImage(contentsOfFile: path)
-        }
-
-        // Load background image
-        backgroundImagePath = style.backgroundImagePath
-        if let path = backgroundImagePath, !path.isEmpty {
-            bgImageView.image = NSImage(contentsOfFile: path)
-        }
-
-        // Load show app name setting
-        showAppNameCheckbox.state = style.showAppName ? .on : .off
-    }
-
-    private func cornerToIndex(_ corner: String) -> Int {
-        switch corner {
-        case "topLeft": return 0
-        case "topCenter": return 1
-        case "topRight": return 2
-        case "middleLeft": return 3
-        case "center": return 4
-        case "middleRight": return 5
-        case "bottomLeft": return 6
-        case "bottomCenter": return 7
-        case "bottomRight": return 8
-        default: return 6
-        }
-    }
-
-    private func indexToCorner(_ index: Int) -> String {
-        switch index {
-        case 0: return "topLeft"
-        case 1: return "topCenter"
-        case 2: return "topRight"
-        case 3: return "middleLeft"
-        case 4: return "center"
-        case 5: return "middleRight"
-        case 6: return "bottomLeft"
-        case 7: return "bottomCenter"
-        case 8: return "bottomRight"
-        default: return "bottomLeft"
-        }
-    }
-
-    private func colorFromHex(_ hex: String) -> NSColor {
-        let cleanHex = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        guard cleanHex.count == 6 else { return .black }
-
-        var rgb: UInt64 = 0
-        Scanner(string: cleanHex).scanHexInt64(&rgb)
-        let r = CGFloat((rgb >> 16) & 0xFF) / 255.0
-        let g = CGFloat((rgb >> 8) & 0xFF) / 255.0
-        let b = CGFloat(rgb & 0xFF) / 255.0
-        return NSColor(red: r, green: g, blue: b, alpha: 1.0)
-    }
-
-    private func hexFromColor(_ color: NSColor) -> String {
-        guard let rgbColor = color.usingColorSpace(.sRGB) else { return "000000" }
-        let r = Int(rgbColor.redComponent * 255)
-        let g = Int(rgbColor.greenComponent * 255)
-        let b = Int(rgbColor.blueComponent * 255)
-        return String(format: "%02X%02X%02X", r, g, b)
-    }
-
-    @objc private func scaleChanged() {
-        scaleLabel.stringValue = String(format: "%.1fx", scaleSlider.doubleValue)
-    }
-
-    @objc private func opacityChanged() {
-        opacityLabel.stringValue = String(format: "%.0f%%", opacitySlider.doubleValue * 100)
-    }
-
-    @objc private func chooseIcon() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Choose an icon image (recommended: square, e.g. 128x128)"
-
-        guard let win = window else { return }
-        panel.beginSheetModal(for: win) { [weak self] response in
-            if response == .OK, let url = panel.url {
-                self?.customIconPath = url.path
-                self?.iconImageView.image = NSImage(contentsOf: url)
-            }
-        }
-    }
-
-    @objc private func clearIcon() {
-        customIconPath = nil
-        iconImageView.image = nil
-    }
-
-    @objc private func chooseBackgroundImage() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Choose a background image (recommended: 16:9 or wider)"
-
-        guard let win = window else { return }
-        panel.beginSheetModal(for: win) { [weak self] response in
-            if response == .OK, let url = panel.url {
-                self?.backgroundImagePath = url.path
-                self?.bgImageView.image = NSImage(contentsOf: url)
-            }
-        }
-    }
-
-    @objc private func clearBackgroundImage() {
-        backgroundImagePath = nil
-        bgImageView.image = nil
+        styleControlsView.style = style
     }
 
     @objc private func cancel() {
@@ -656,24 +310,12 @@ class StyleEditorWindowController: NSWindowController {
     }
 
     @objc private func save() {
-        style.name = nameField.stringValue.isEmpty ? "Unnamed Style" : nameField.stringValue
-        style.position = indexToCorner(positionPopup.indexOfSelectedItem)
-        style.offsetX = Double(offsetXField.stringValue) ?? 20
-        style.offsetY = Double(offsetYField.stringValue) ?? 20
-        style.scale = scaleSlider.doubleValue
-        style.opacity = opacitySlider.doubleValue
-        style.dwellTime = Double(dwellField.stringValue) ?? 5
+        // Get values from controls
+        var updatedStyle = styleControlsView.style
+        updatedStyle.id = style.id  // Preserve original ID
+        updatedStyle.name = nameField.stringValue.isEmpty ? "Unnamed Style" : nameField.stringValue
 
-        style.backgroundColorHex = hexFromColor(bgColorWell.color)
-        style.appColorHex = hexFromColor(appColorWell.color)
-        style.titleColorHex = hexFromColor(titleColorWell.color)
-        style.subtitleColorHex = hexFromColor(subtitleColorWell.color)
-        style.bodyColorHex = hexFromColor(bodyColorWell.color)
-        style.customIconPath = customIconPath
-        style.backgroundImagePath = backgroundImagePath
-        style.showAppName = showAppNameCheckbox.state == .on
-
-        onSave(style)
+        onSave(updatedStyle)
         window?.orderOut(nil)
     }
 

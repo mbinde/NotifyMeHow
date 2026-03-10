@@ -24,6 +24,9 @@ struct CustomNotificationConfig {
     var maxBodyCharacters: Int = 500  // Max characters for body text (0 = unlimited)
     var maxBodyLines: Int = 4  // Max lines for body text (0 = unlimited)
     var showAppName: Bool = true  // Whether to show app name label
+    var borderWidth: CGFloat = 0  // Border width (0 = none)
+    var borderColor: NSColor = .white  // Border color
+    var animation: String = "none"  // Animation type: none, pulse, jiggle, bounce
 }
 
 /// Content extracted from a notification
@@ -189,12 +192,53 @@ class CustomNotificationManager {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.3
                 window.animator().alphaValue = self.config.opacity
+            } completionHandler: { [weak self] in
+                // Start animation after fade-in completes
+                self?.startAnimation(for: window)
             }
 
             // Auto-dismiss after dwell time
             DispatchQueue.main.asyncAfter(deadline: .now() + self.config.dwellTime) { [weak self] in
                 self?.dismissNotification(window)
             }
+        }
+    }
+
+    private func startAnimation(for window: NSWindow) {
+        guard let contentView = window.contentView else { return }
+        contentView.wantsLayer = true
+        guard let layer = contentView.layer else { return }
+
+        switch config.animation {
+        case "pulse":
+            let pulse = CABasicAnimation(keyPath: "opacity")
+            pulse.fromValue = config.opacity
+            pulse.toValue = config.opacity * 0.6
+            pulse.duration = 0.8
+            pulse.autoreverses = true
+            pulse.repeatCount = .infinity
+            pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            layer.add(pulse, forKey: "pulse")
+
+        case "jiggle":
+            let jiggle = CAKeyframeAnimation(keyPath: "transform.rotation.z")
+            let angle = Double.pi / 60  // ~3 degrees
+            jiggle.values = [-angle, angle, -angle]
+            jiggle.duration = 0.15
+            jiggle.repeatCount = .infinity
+            layer.add(jiggle, forKey: "jiggle")
+
+        case "bounce":
+            let bounce = CAKeyframeAnimation(keyPath: "transform.scale")
+            bounce.values = [1.0, 1.05, 0.98, 1.02, 1.0]
+            bounce.keyTimes = [0, 0.2, 0.5, 0.75, 1.0]
+            bounce.duration = 0.5
+            bounce.repeatCount = .infinity
+            bounce.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            layer.add(bounce, forKey: "bounce")
+
+        default:
+            break  // "none" - no animation
         }
     }
 
@@ -296,6 +340,12 @@ class CustomNotificationManager {
         contentView.wantsLayer = true
         contentView.layer?.cornerRadius = scaledCornerRadius
         contentView.layer?.masksToBounds = true
+
+        // Add border if configured
+        if config.borderWidth > 0 {
+            contentView.layer?.borderWidth = config.borderWidth * config.scaleFactor
+            contentView.layer?.borderColor = config.borderColor.cgColor
+        }
 
         // Add background - either image or solid color
         if let bgImage = config.backgroundImage {
