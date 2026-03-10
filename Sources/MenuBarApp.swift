@@ -2,12 +2,20 @@ import Cocoa
 import ApplicationServices
 import UserNotifications
 
+/// Current app version - update this for each release
+let appVersion = "0.1"
+
+/// GitHub repository for update checks
+let githubRepo = "mbinde/NotifyMeHow"
+
 /// Menu bar application for NotifyMeHow
 class MenuBarApp: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var statusMenu: NSMenu!
     private var monitor: NotificationMonitor?
     private let settings = Settings.shared
+    private var latestVersion: String?
+    private var updateURL: URL?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Create status bar item with fixed length
@@ -56,14 +64,68 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
             startMonitoring()
             rebuildMenu()
         }
+
+        // Check for updates in the background
+        checkForUpdates()
+    }
+
+    private func checkForUpdates() {
+        guard let url = URL(string: "https://api.github.com/repos/\(githubRepo)/releases/latest") else { return }
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 10
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let tagName = json["tag_name"] as? String,
+                  let htmlURL = json["html_url"] as? String else {
+                return
+            }
+
+            // Strip leading 'v' if present for comparison
+            let remoteVersion = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
+
+            // Simple version comparison - check if remote is different and newer
+            if remoteVersion != appVersion && self?.isNewerVersion(remoteVersion, than: appVersion) == true {
+                DispatchQueue.main.async {
+                    self?.latestVersion = remoteVersion
+                    self?.updateURL = URL(string: htmlURL)
+                    self?.rebuildMenu()
+                }
+            }
+        }.resume()
+    }
+
+    /// Simple version comparison (handles versions like "0.1", "0.2", "1.0")
+    private func isNewerVersion(_ remote: String, than current: String) -> Bool {
+        let remoteParts = remote.split(separator: ".").compactMap { Int($0) }
+        let currentParts = current.split(separator: ".").compactMap { Int($0) }
+
+        for i in 0..<max(remoteParts.count, currentParts.count) {
+            let r = i < remoteParts.count ? remoteParts[i] : 0
+            let c = i < currentParts.count ? currentParts[i] : 0
+            if r > c { return true }
+            if r < c { return false }
+        }
+        return false
     }
 
     private func rebuildMenu() {
         statusMenu.removeAllItems()
 
         // Header with status
-        let headerItem = NSMenuItem(title: "NotifyMeHow", action: nil, keyEquivalent: "")
+        let headerItem = NSMenuItem(title: "NotifyMeHow v\(appVersion)", action: nil, keyEquivalent: "")
         statusMenu.addItem(headerItem)
+
+        // Update available notification
+        if let latestVersion = latestVersion {
+            let updateItem = NSMenuItem(title: "Update Available (v\(latestVersion))", action: #selector(openUpdatePage(_:)), keyEquivalent: "")
+            updateItem.target = self
+            updateItem.image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil)
+            statusMenu.addItem(updateItem)
+        }
 
         // How it works
         let helpItem = NSMenuItem(title: "How It Works...", action: #selector(showHowItWorks(_:)), keyEquivalent: "")
@@ -238,21 +300,28 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
         let alert = NSAlert()
         alert.messageText = "How NotifyMeHow Works"
         alert.informativeText = """
-        macOS Limitations:
-        • System notifications cannot be resized or restyled
-        • They can only be repositioned on screen
+        macOS notifications can't be resized or restyled—only repositioned.
 
-        What NotifyMeHow Can Do:
-        • Reposition system notifications to any corner
-        • Create custom duplicate notifications with full styling (size, colors, fonts, icons)
-        • Apply different styles based on which app sent the notification
+        NotifyMeHow lets you:
+        • Reposition system notifications to any corner or center
+        • Create custom notifications with full control over size, colors, position, and animations
+        • Set up rules to match notifications by app or keywords
+        • Hide the system notification entirely and show only your custom version
 
-        The "Reposition To" menu moves system notifications.
-        Use "Custom Notification Styles" to create styled duplicates that appear alongside (or instead of) the system notification.
+        Use "Reposition To" to move system notifications.
+        Use "Custom Notification Styles" to create rules and styles.
+
+        NotifyMeHow v\(appVersion)
         """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    @objc func openUpdatePage(_ sender: NSMenuItem) {
+        if let url = updateURL {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     @objc func quitApp(_ sender: NSMenuItem) {

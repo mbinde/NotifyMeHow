@@ -60,4 +60,4 @@ NotifyMeHow also works from the terminal. Run `NotifyMeHow --help` for options, 
 
 ## License
 
-MIT
+GPL-3.0. See [LICENSE](LICENSE) for details.

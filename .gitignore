@@ -5,3 +5,16 @@ xcuserdata/
 DerivedData/
 .DS_Store
 NotifyMeHow.app/
+
+# Release artifacts (upload manually to GitHub Releases)
+release/
+*.zip
+
+# Never commit credentials or secrets
+*.p12
+*.cer
+*.provisionprofile
+.env
+.env.*
+*credentials*
+*secret*
