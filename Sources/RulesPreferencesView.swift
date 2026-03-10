@@ -237,30 +237,45 @@ extension RulesPreferencesView: NSTableViewDelegate {
         let rule = rulesManager.rules[row]
 
         let cellIdentifier = tableColumn?.identifier ?? NSUserInterfaceItemIdentifier("cell")
-        var cell = tableView.makeView(withIdentifier: cellIdentifier, owner: self) as? NSTextField
-        if cell == nil {
-            cell = NSTextField(labelWithString: "")
-            cell?.identifier = cellIdentifier
+        var cellView = tableView.makeView(withIdentifier: cellIdentifier, owner: self) as? NSTableCellView
+        if cellView == nil {
+            cellView = NSTableCellView()
+            cellView?.identifier = cellIdentifier
+
+            let textField = NSTextField(labelWithString: "")
+            textField.translatesAutoresizingMaskIntoConstraints = false
+            textField.lineBreakMode = .byTruncatingTail
+            cellView?.addSubview(textField)
+            cellView?.textField = textField
+
+            // Center vertically, pin to leading/trailing edges
+            NSLayoutConstraint.activate([
+                textField.leadingAnchor.constraint(equalTo: cellView!.leadingAnchor, constant: 4),
+                textField.trailingAnchor.constraint(equalTo: cellView!.trailingAnchor, constant: -4),
+                textField.centerYAnchor.constraint(equalTo: cellView!.centerYAnchor)
+            ])
         }
 
+        let textField = cellView?.textField
+
         if tableColumn?.identifier.rawValue == "name" {
-            cell?.stringValue = rule.displayName
+            textField?.stringValue = rule.displayName
             if rule.styleId == nil {
-                cell?.textColor = .secondaryLabelColor
+                textField?.textColor = .secondaryLabelColor
             } else {
-                cell?.textColor = .labelColor
+                textField?.textColor = .labelColor
             }
         } else if tableColumn?.identifier.rawValue == "criteria" {
             // Show style name or criteria summary
             if let style = rule.style {
-                cell?.stringValue = "Style: \(style.name)"
+                textField?.stringValue = "Style: \(style.name)"
             } else {
-                cell?.stringValue = "No custom notification"
+                textField?.stringValue = "No custom notification"
             }
-            cell?.textColor = .secondaryLabelColor
+            textField?.textColor = .secondaryLabelColor
         }
 
-        return cell
+        return cellView
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {

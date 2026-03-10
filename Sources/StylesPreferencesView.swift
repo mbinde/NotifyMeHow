@@ -202,21 +202,36 @@ extension StylesPreferencesView: NSTableViewDelegate {
         let style = stylesManager.styles[row]
 
         let cellIdentifier = tableColumn?.identifier ?? NSUserInterfaceItemIdentifier("cell")
-        var cell = tableView.makeView(withIdentifier: cellIdentifier, owner: self) as? NSTextField
-        if cell == nil {
-            cell = NSTextField(labelWithString: "")
-            cell?.identifier = cellIdentifier
+        var cellView = tableView.makeView(withIdentifier: cellIdentifier, owner: self) as? NSTableCellView
+        if cellView == nil {
+            cellView = NSTableCellView()
+            cellView?.identifier = cellIdentifier
+
+            let textField = NSTextField(labelWithString: "")
+            textField.translatesAutoresizingMaskIntoConstraints = false
+            textField.lineBreakMode = .byTruncatingTail
+            cellView?.addSubview(textField)
+            cellView?.textField = textField
+
+            // Center vertically, pin to leading/trailing edges
+            NSLayoutConstraint.activate([
+                textField.leadingAnchor.constraint(equalTo: cellView!.leadingAnchor, constant: 4),
+                textField.trailingAnchor.constraint(equalTo: cellView!.trailingAnchor, constant: -4),
+                textField.centerYAnchor.constraint(equalTo: cellView!.centerYAnchor)
+            ])
         }
+
+        let textField = cellView?.textField
 
         if tableColumn?.identifier.rawValue == "name" {
-            cell?.stringValue = style.name
-            cell?.textColor = .labelColor
+            textField?.stringValue = style.name
+            textField?.textColor = .labelColor
         } else if tableColumn?.identifier.rawValue == "preview" {
-            cell?.stringValue = describeStyle(style)
-            cell?.textColor = .secondaryLabelColor
+            textField?.stringValue = describeStyle(style)
+            textField?.textColor = .secondaryLabelColor
         }
 
-        return cell
+        return cellView
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
