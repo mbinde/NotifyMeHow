@@ -18,6 +18,11 @@ mkdir -p "${APP_DIR}/Contents/Resources"
 # Copy executable (overwrite only the binary)
 cp -f "${BUILD_DIR}/${APP_NAME}" "${APP_DIR}/Contents/MacOS/"
 
+# Copy resources (icons)
+cp -f "Resources/AppIcon.icns" "${APP_DIR}/Contents/Resources/" 2>/dev/null || true
+cp -f "Resources/MenuBarIcon.png" "${APP_DIR}/Contents/Resources/" 2>/dev/null || true
+cp -f "Resources/MenuBarIcon@2x.png" "${APP_DIR}/Contents/Resources/" 2>/dev/null || true
+
 # Create Info.plist
 cat > "${APP_DIR}/Contents/Info.plist" << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -44,6 +49,8 @@ cat > "${APP_DIR}/Contents/Info.plist" << 'EOF'
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
     <key>NSAccessibilityUsageDescription</key>

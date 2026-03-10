@@ -354,7 +354,7 @@ class RuleEditorWindowController: NSWindowController {
         // Rule Name
         y -= 25
         let nameLabel = createLabel("Rule Name:", bold: true)
-        nameLabel.frame = NSRect(x: padding, y: y, width: 100, height: 22)
+        nameLabel.frame = NSRect(x: padding, y: y + 2, width: 100, height: 22)
         contentView.addSubview(nameLabel)
 
         nameField = createTextField(placeholder: "(auto-generated from criteria)")
@@ -369,7 +369,7 @@ class RuleEditorWindowController: NSWindowController {
 
         y -= 28
         let appLabel = createLabel("App name contains:")
-        appLabel.frame = NSRect(x: padding, y: y, width: 130, height: 22)
+        appLabel.frame = NSRect(x: padding, y: y + 2, width: 130, height: 22)
         contentView.addSubview(appLabel)
 
         appNameField = createTextField(placeholder: "e.g., Messages, Slack")
@@ -378,7 +378,7 @@ class RuleEditorWindowController: NSWindowController {
 
         y -= 28
         let keywordsLabel = createLabel("Keywords:")
-        keywordsLabel.frame = NSRect(x: padding, y: y, width: 130, height: 22)
+        keywordsLabel.frame = NSRect(x: padding, y: y + 2, width: 130, height: 22)
         contentView.addSubview(keywordsLabel)
 
         keywordsField = createTextField(placeholder: "e.g., urgent, meeting, John")
@@ -394,7 +394,7 @@ class RuleEditorWindowController: NSWindowController {
 
         y -= 24
         let matchLabel = createLabel("Match:")
-        matchLabel.frame = NSRect(x: padding, y: y, width: 130, height: 22)
+        matchLabel.frame = NSRect(x: padding, y: y + 2, width: 130, height: 22)
         contentView.addSubview(matchLabel)
 
         matchAnyRadio = NSButton(radioButtonWithTitle: "Any keyword", target: nil, action: nil)
@@ -413,7 +413,7 @@ class RuleEditorWindowController: NSWindowController {
 
         y -= 28
         let styleLabel = createLabel("Style:")
-        styleLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
+        styleLabel.frame = NSRect(x: padding, y: y + 3, width: 50, height: 22)
         contentView.addSubview(styleLabel)
 
         stylePopup = NSPopUpButton(frame: NSRect(x: padding + 55, y: y, width: 200, height: 26), pullsDown: false)

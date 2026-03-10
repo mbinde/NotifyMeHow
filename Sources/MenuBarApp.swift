@@ -17,9 +17,16 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
         statusMenu = NSMenu()
         rebuildMenu()
 
-        // Set up button
+        // Set up button with custom icon
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "bell.badge", accessibilityDescription: "NotifyMeHow")
+            if let iconPath = Bundle.main.path(forResource: "MenuBarIcon", ofType: "png"),
+               let icon = NSImage(contentsOfFile: iconPath) {
+                icon.isTemplate = true  // Allows macOS to adapt color for light/dark mode
+                button.image = icon
+            } else {
+                // Fallback to system symbol if custom icon not found
+                button.image = NSImage(systemSymbolName: "bell.badge", accessibilityDescription: "NotifyMeHow")
+            }
             button.toolTip = "NotifyMeHow - Click to configure notification position"
         }
 
@@ -200,7 +207,11 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
         monitor?.start()
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "bell.badge.fill", accessibilityDescription: "NotifyMeHow Active")
+            if let iconPath = Bundle.main.path(forResource: "MenuBarIcon", ofType: "png"),
+               let icon = NSImage(contentsOfFile: iconPath) {
+                icon.isTemplate = true
+                button.image = icon
+            }
         }
     }
 

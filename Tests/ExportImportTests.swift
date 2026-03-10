@@ -27,6 +27,7 @@ final class ExportImportTests: XCTestCase {
         style.borderColorHex = "AABBCC"
         style.animation = "pulse"
         style.animationLoops = true
+        style.hideSystemNotification = true
 
         let encoder = JSONEncoder()
         let data = try encoder.encode(style)
@@ -52,6 +53,7 @@ final class ExportImportTests: XCTestCase {
         XCTAssertEqual(json["borderColorHex"] as? String, "AABBCC")
         XCTAssertEqual(json["animation"] as? String, "pulse")
         XCTAssertEqual(json["animationLoops"] as? Bool, true)
+        XCTAssertEqual(json["hideSystemNotification"] as? Bool, true)
     }
 
     func testNotificationStyleDecodesAllFields() throws {
@@ -76,7 +78,8 @@ final class ExportImportTests: XCTestCase {
             "borderWidth": 2.5,
             "borderColorHex": "FEDCBA",
             "animation": "wiggle",
-            "animationLoops": true
+            "animationLoops": true,
+            "hideSystemNotification": true
         }
         """
 
@@ -103,6 +106,7 @@ final class ExportImportTests: XCTestCase {
         XCTAssertEqual(style.borderColorHex, "FEDCBA")
         XCTAssertEqual(style.animation, "wiggle")
         XCTAssertEqual(style.animationLoops, true)
+        XCTAssertEqual(style.hideSystemNotification, true)
     }
 
     func testNotificationStyleRoundTrip() throws {
@@ -126,6 +130,7 @@ final class ExportImportTests: XCTestCase {
         original.borderColorHex = "9ABCDE"
         original.animation = "bounce"
         original.animationLoops = false
+        original.hideSystemNotification = true
 
         let encoder = JSONEncoder()
         let data = try encoder.encode(original)
@@ -153,6 +158,7 @@ final class ExportImportTests: XCTestCase {
         XCTAssertEqual(decoded.borderColorHex, original.borderColorHex)
         XCTAssertEqual(decoded.animation, original.animation)
         XCTAssertEqual(decoded.animationLoops, original.animationLoops)
+        XCTAssertEqual(decoded.hideSystemNotification, original.hideSystemNotification)
     }
 
     // MARK: - NotificationRule Codable Tests
@@ -162,6 +168,8 @@ final class ExportImportTests: XCTestCase {
         rule.id = UUID(uuidString: "ABCDEF12-3456-7890-ABCD-EF1234567890")!
         rule.name = "Test Rule"
         rule.criteria.appName = "Slack"
+        rule.criteria.keywords = "urgent, important"
+        rule.criteria.matchAll = true
         rule.criteria.titleContains = "urgent"
         rule.criteria.bodyContains = "meeting"
         rule.styleId = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
@@ -178,6 +186,8 @@ final class ExportImportTests: XCTestCase {
 
         let criteria = json["criteria"] as! [String: Any]
         XCTAssertEqual(criteria["appName"] as? String, "Slack")
+        XCTAssertEqual(criteria["keywords"] as? String, "urgent, important")
+        XCTAssertEqual(criteria["matchAll"] as? Bool, true)
         XCTAssertEqual(criteria["titleContains"] as? String, "urgent")
         XCTAssertEqual(criteria["bodyContains"] as? String, "meeting")
     }
@@ -189,6 +199,8 @@ final class ExportImportTests: XCTestCase {
             "name": "Decoded Rule",
             "criteria": {
                 "appName": "Messages",
+                "keywords": "from, message",
+                "matchAll": false,
                 "titleContains": "from",
                 "bodyContains": "hello"
             },
@@ -203,6 +215,8 @@ final class ExportImportTests: XCTestCase {
         XCTAssertEqual(rule.id.uuidString, "ABCDEF12-3456-7890-ABCD-EF1234567890")
         XCTAssertEqual(rule.name, "Decoded Rule")
         XCTAssertEqual(rule.criteria.appName, "Messages")
+        XCTAssertEqual(rule.criteria.keywords, "from, message")
+        XCTAssertEqual(rule.criteria.matchAll, false)
         XCTAssertEqual(rule.criteria.titleContains, "from")
         XCTAssertEqual(rule.criteria.bodyContains, "hello")
         XCTAssertEqual(rule.styleId?.uuidString, "22222222-3333-4444-5555-666666666666")
@@ -213,6 +227,8 @@ final class ExportImportTests: XCTestCase {
         var original = NotificationRule()
         original.name = "Round Trip Rule"
         original.criteria.appName = "Calendar"
+        original.criteria.keywords = "reminder, event"
+        original.criteria.matchAll = true
         original.criteria.titleContains = "reminder"
         original.criteria.bodyContains = "event"
         original.styleId = UUID()
@@ -227,6 +243,8 @@ final class ExportImportTests: XCTestCase {
         XCTAssertEqual(decoded.id, original.id)
         XCTAssertEqual(decoded.name, original.name)
         XCTAssertEqual(decoded.criteria.appName, original.criteria.appName)
+        XCTAssertEqual(decoded.criteria.keywords, original.criteria.keywords)
+        XCTAssertEqual(decoded.criteria.matchAll, original.criteria.matchAll)
         XCTAssertEqual(decoded.criteria.titleContains, original.criteria.titleContains)
         XCTAssertEqual(decoded.criteria.bodyContains, original.criteria.bodyContains)
         XCTAssertEqual(decoded.styleId, original.styleId)
@@ -327,7 +345,8 @@ final class ExportImportTests: XCTestCase {
                     "borderWidth": 0,
                     "borderColorHex": "FFFFFF",
                     "animation": "none",
-                    "animationLoops": false
+                    "animationLoops": false,
+                    "hideSystemNotification": true
                 }
             ],
             "rules": [
@@ -336,6 +355,8 @@ final class ExportImportTests: XCTestCase {
                     "name": "Imported Rule",
                     "criteria": {
                         "appName": "Mail",
+                        "keywords": "invoice",
+                        "matchAll": false,
                         "titleContains": "",
                         "bodyContains": ""
                     },
@@ -368,6 +389,7 @@ final class ExportImportTests: XCTestCase {
         XCTAssertEqual(exportData.rules.count, 1)
         XCTAssertEqual(exportData.rules[0].name, "Imported Rule")
         XCTAssertEqual(exportData.rules[0].criteria.appName, "Mail")
+        XCTAssertEqual(exportData.rules[0].criteria.keywords, "invoice")
         XCTAssertEqual(exportData.rules[0].styleId?.uuidString, "11111111-1111-1111-1111-111111111111")
     }
 
@@ -546,6 +568,8 @@ final class ExportImportTests: XCTestCase {
         var rule = NotificationRule()
         rule.name = "Match All"
         rule.criteria.appName = ""
+        rule.criteria.keywords = ""
+        rule.criteria.matchAll = false
         rule.criteria.titleContains = ""
         rule.criteria.bodyContains = ""
 
@@ -556,6 +580,7 @@ final class ExportImportTests: XCTestCase {
         let decoded = try decoder.decode(NotificationRule.self, from: data)
 
         XCTAssertTrue(decoded.criteria.isEmpty)
+        XCTAssertEqual(decoded.criteria.keywords, "")
     }
 
     func testSpecialCharactersInStrings() throws {

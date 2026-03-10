@@ -100,7 +100,7 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
 
         y -= 30
         let positionLabel = createLabel("Position:")
-        positionLabel.frame = NSRect(x: padding, y: y, width: 80, height: 22)
+        positionLabel.frame = NSRect(x: padding, y: y + 3, width: 80, height: 22)
         addSubview(positionLabel)
 
         positionPopup = NSPopUpButton(frame: NSRect(x: padding + 90, y: y, width: 150, height: 26), pullsDown: false)
@@ -115,11 +115,11 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
 
         y -= 30
         let offsetLabel = createLabel("Fine-tune:")
-        offsetLabel.frame = NSRect(x: padding, y: y, width: 80, height: 22)
+        offsetLabel.frame = NSRect(x: padding, y: y + 2, width: 80, height: 22)
         addSubview(offsetLabel)
 
         let offsetXLabel = createLabel("X:")
-        offsetXLabel.frame = NSRect(x: padding + 70, y: y, width: 20, height: 22)
+        offsetXLabel.frame = NSRect(x: padding + 70, y: y + 2, width: 20, height: 22)
         addSubview(offsetXLabel)
 
         offsetXField = NSTextField(frame: NSRect(x: padding + 90, y: y, width: 50, height: 22))
@@ -130,7 +130,7 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
         addSubview(offsetXField)
 
         let offsetYLabel = createLabel("Y:")
-        offsetYLabel.frame = NSRect(x: padding + 150, y: y, width: 20, height: 22)
+        offsetYLabel.frame = NSRect(x: padding + 150, y: y + 2, width: 20, height: 22)
         addSubview(offsetYLabel)
 
         offsetYField = NSTextField(frame: NSRect(x: padding + 170, y: y, width: 50, height: 22))
@@ -141,7 +141,7 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
         addSubview(offsetYField)
 
         let pxLabel = createLabel("px")
-        pxLabel.frame = NSRect(x: padding + 225, y: y, width: 20, height: 22)
+        pxLabel.frame = NSRect(x: padding + 225, y: y + 2, width: 20, height: 22)
         addSubview(pxLabel)
 
         // App Settings
