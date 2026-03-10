@@ -255,13 +255,17 @@ class StyleEditorWindowController: NSWindowController {
     private var titleColorWell: NSColorWell!
     private var subtitleColorWell: NSColorWell!
     private var bodyColorWell: NSColorWell!
+    private var iconImageView: NSImageView!
+    private var customIconPath: String? = nil
+    private var bgImageView: NSImageView!
+    private var backgroundImagePath: String? = nil
 
     init(style: NotificationStyle, onSave: @escaping (NotificationStyle) -> Void) {
         self.style = style
         self.onSave = onSave
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 440),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 550),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -422,8 +426,58 @@ class StyleEditorWindowController: NSWindowController {
         bodyColorWell = NSColorWell(frame: NSRect(x: padding + 179, y: y, width: 32, height: 22))
         contentView.addSubview(bodyColorWell)
 
-        // Buttons
+        // Custom Icon
+        y -= 40
+        let iconLabel = createLabel("Custom Icon:")
+        iconLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
+        contentView.addSubview(iconLabel)
+
+        iconImageView = NSImageView(frame: NSRect(x: padding + 90, y: y - 10, width: 40, height: 40))
+        iconImageView.imageScaling = .scaleProportionallyUpOrDown
+        iconImageView.wantsLayer = true
+        iconImageView.layer?.cornerRadius = 20
+        iconImageView.layer?.masksToBounds = true
+        iconImageView.layer?.borderWidth = 1
+        iconImageView.layer?.borderColor = NSColor.separatorColor.cgColor
+        contentView.addSubview(iconImageView)
+
+        let chooseButton = NSButton(title: "Choose...", target: self, action: #selector(chooseIcon))
+        chooseButton.bezelStyle = .rounded
+        chooseButton.frame = NSRect(x: padding + 140, y: y - 2, width: 80, height: 24)
+        contentView.addSubview(chooseButton)
+
+        let clearButton = NSButton(title: "Clear", target: self, action: #selector(clearIcon))
+        clearButton.bezelStyle = .rounded
+        clearButton.frame = NSRect(x: padding + 225, y: y - 2, width: 60, height: 24)
+        contentView.addSubview(clearButton)
+
+        // Background Image
         y -= 50
+        let bgImageLabel = createLabel("Background:")
+        bgImageLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
+        contentView.addSubview(bgImageLabel)
+
+        bgImageView = NSImageView(frame: NSRect(x: padding + 90, y: y - 10, width: 60, height: 40))
+        bgImageView.imageScaling = .scaleProportionallyUpOrDown
+        bgImageView.wantsLayer = true
+        bgImageView.layer?.cornerRadius = 4
+        bgImageView.layer?.masksToBounds = true
+        bgImageView.layer?.borderWidth = 1
+        bgImageView.layer?.borderColor = NSColor.separatorColor.cgColor
+        contentView.addSubview(bgImageView)
+
+        let chooseBgButton = NSButton(title: "Choose...", target: self, action: #selector(chooseBackgroundImage))
+        chooseBgButton.bezelStyle = .rounded
+        chooseBgButton.frame = NSRect(x: padding + 160, y: y - 2, width: 80, height: 24)
+        contentView.addSubview(chooseBgButton)
+
+        let clearBgButton = NSButton(title: "Clear", target: self, action: #selector(clearBackgroundImage))
+        clearBgButton.bezelStyle = .rounded
+        clearBgButton.frame = NSRect(x: padding + 245, y: y - 2, width: 60, height: 24)
+        contentView.addSubview(clearBgButton)
+
+        // Buttons
+        y -= 60
         let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancel))
         cancelButton.bezelStyle = .rounded
         cancelButton.frame = NSRect(x: contentView.frame.width - padding - 170, y: y, width: 80, height: 28)
@@ -463,6 +517,18 @@ class StyleEditorWindowController: NSWindowController {
         titleColorWell.color = colorFromHex(style.titleColorHex)
         subtitleColorWell.color = colorFromHex(style.subtitleColorHex)
         bodyColorWell.color = colorFromHex(style.bodyColorHex)
+
+        // Load custom icon
+        customIconPath = style.customIconPath
+        if let path = customIconPath, !path.isEmpty {
+            iconImageView.image = NSImage(contentsOfFile: path)
+        }
+
+        // Load background image
+        backgroundImagePath = style.backgroundImagePath
+        if let path = backgroundImagePath, !path.isEmpty {
+            bgImageView.image = NSImage(contentsOfFile: path)
+        }
     }
 
     private func cornerToIndex(_ corner: String) -> Int {
@@ -523,6 +589,42 @@ class StyleEditorWindowController: NSWindowController {
         opacityLabel.stringValue = String(format: "%.0f%%", opacitySlider.doubleValue * 100)
     }
 
+    @objc private func chooseIcon() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Choose an icon image for this notification style"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            customIconPath = url.path
+            iconImageView.image = NSImage(contentsOf: url)
+        }
+    }
+
+    @objc private func clearIcon() {
+        customIconPath = nil
+        iconImageView.image = nil
+    }
+
+    @objc private func chooseBackgroundImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Choose a background image for this notification style"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            backgroundImagePath = url.path
+            bgImageView.image = NSImage(contentsOf: url)
+        }
+    }
+
+    @objc private func clearBackgroundImage() {
+        backgroundImagePath = nil
+        bgImageView.image = nil
+    }
+
     @objc private func cancel() {
         window?.orderOut(nil)
     }
@@ -541,6 +643,8 @@ class StyleEditorWindowController: NSWindowController {
         style.titleColorHex = hexFromColor(titleColorWell.color)
         style.subtitleColorHex = hexFromColor(subtitleColorWell.color)
         style.bodyColorHex = hexFromColor(bodyColorWell.color)
+        style.customIconPath = customIconPath
+        style.backgroundImagePath = backgroundImagePath
 
         onSave(style)
         window?.orderOut(nil)

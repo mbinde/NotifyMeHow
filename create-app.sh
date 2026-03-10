@@ -11,12 +11,12 @@ echo "Building ${APP_NAME}..."
 swift build
 
 echo "Creating app bundle..."
-rm -rf "${APP_DIR}"
+# Only create directories if they don't exist (preserve permissions)
 mkdir -p "${APP_DIR}/Contents/MacOS"
 mkdir -p "${APP_DIR}/Contents/Resources"
 
-# Copy executable
-cp "${BUILD_DIR}/${APP_NAME}" "${APP_DIR}/Contents/MacOS/"
+# Copy executable (overwrite only the binary)
+cp -f "${BUILD_DIR}/${APP_NAME}" "${APP_DIR}/Contents/MacOS/"
 
 # Create Info.plist
 cat > "${APP_DIR}/Contents/Info.plist" << 'EOF'

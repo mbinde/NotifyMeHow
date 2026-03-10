@@ -15,6 +15,8 @@ struct NotificationStyle: Codable, Identifiable {
     var titleColorHex: String = "FFFFFF"
     var subtitleColorHex: String = "DDDDDD"
     var bodyColorHex: String = "DDDDDD"
+    var customIconPath: String? = nil           // Path to custom icon image
+    var backgroundImagePath: String? = nil      // Path to background image
 
     /// Convert to CustomNotificationConfig
     func toConfig() -> CustomNotificationConfig {
@@ -31,6 +33,16 @@ struct NotificationStyle: Codable, Identifiable {
         config.titleColor = colorFromHex(titleColorHex)
         config.subtitleColor = colorFromHex(subtitleColorHex)
         config.bodyColor = colorFromHex(bodyColorHex)
+
+        // Load custom icon if path is set
+        if let iconPath = customIconPath, !iconPath.isEmpty {
+            config.customIcon = NSImage(contentsOfFile: iconPath)
+        }
+
+        // Load background image if path is set
+        if let bgImagePath = backgroundImagePath, !bgImagePath.isEmpty {
+            config.backgroundImage = NSImage(contentsOfFile: bgImagePath)
+        }
 
         return config
     }

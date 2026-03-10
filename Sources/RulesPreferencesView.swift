@@ -305,6 +305,10 @@ class RuleEditorWindowController: NSWindowController {
     private var titleColorWell: NSColorWell!
     private var subtitleColorWell: NSColorWell!
     private var bodyColorWell: NSColorWell!
+    private var iconImageView: NSImageView!
+    private var customIconPath: String? = nil
+    private var bgImageView: NSImageView!
+    private var backgroundImagePath: String? = nil
 
     // Track if we're editing a custom style
     private var isCustomStyle = false
@@ -317,7 +321,7 @@ class RuleEditorWindowController: NSWindowController {
         self.onSave = onSave
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 510),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 620),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -544,6 +548,56 @@ class RuleEditorWindowController: NSWindowController {
         bodyColorWell = NSColorWell(frame: NSRect(x: padding + 179, y: y, width: 32, height: 22))
         customStyleContainer.addSubview(bodyColorWell)
 
+        // Custom Icon
+        y -= 35
+        let iconLabel = createLabel("Custom Icon:")
+        iconLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
+        customStyleContainer.addSubview(iconLabel)
+
+        iconImageView = NSImageView(frame: NSRect(x: padding + 90, y: y - 10, width: 40, height: 40))
+        iconImageView.imageScaling = .scaleProportionallyUpOrDown
+        iconImageView.wantsLayer = true
+        iconImageView.layer?.cornerRadius = 20
+        iconImageView.layer?.masksToBounds = true
+        iconImageView.layer?.borderWidth = 1
+        iconImageView.layer?.borderColor = NSColor.separatorColor.cgColor
+        customStyleContainer.addSubview(iconImageView)
+
+        let chooseButton = NSButton(title: "Choose...", target: self, action: #selector(chooseIcon))
+        chooseButton.bezelStyle = .rounded
+        chooseButton.frame = NSRect(x: padding + 140, y: y - 2, width: 80, height: 24)
+        customStyleContainer.addSubview(chooseButton)
+
+        let clearButton = NSButton(title: "Clear", target: self, action: #selector(clearIcon))
+        clearButton.bezelStyle = .rounded
+        clearButton.frame = NSRect(x: padding + 225, y: y - 2, width: 60, height: 24)
+        customStyleContainer.addSubview(clearButton)
+
+        // Background Image
+        y -= 45
+        let bgImageLabel = createLabel("Background:")
+        bgImageLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
+        customStyleContainer.addSubview(bgImageLabel)
+
+        bgImageView = NSImageView(frame: NSRect(x: padding + 90, y: y - 10, width: 60, height: 40))
+        bgImageView.imageScaling = .scaleProportionallyUpOrDown
+        bgImageView.wantsLayer = true
+        bgImageView.layer?.cornerRadius = 4
+        bgImageView.layer?.masksToBounds = true
+        bgImageView.layer?.borderWidth = 1
+        bgImageView.layer?.borderColor = NSColor.separatorColor.cgColor
+        customStyleContainer.addSubview(bgImageView)
+
+        let chooseBgButton = NSButton(title: "Choose...", target: self, action: #selector(chooseBackgroundImage))
+        chooseBgButton.bezelStyle = .rounded
+        chooseBgButton.frame = NSRect(x: padding + 160, y: y - 2, width: 80, height: 24)
+        customStyleContainer.addSubview(chooseBgButton)
+
+        let clearBgButton = NSButton(title: "Clear", target: self, action: #selector(clearBackgroundImage))
+        clearBgButton.bezelStyle = .rounded
+        clearBgButton.frame = NSRect(x: padding + 245, y: y - 2, width: 60, height: 24)
+        customStyleContainer.addSubview(clearBgButton)
+
         // Set defaults
         loadDefaultStyleValues()
     }
@@ -563,6 +617,10 @@ class RuleEditorWindowController: NSWindowController {
         titleColorWell.color = colorFromHex(defaultStyle.titleColorHex)
         subtitleColorWell.color = colorFromHex(defaultStyle.subtitleColorHex)
         bodyColorWell.color = colorFromHex(defaultStyle.bodyColorHex)
+        customIconPath = nil
+        iconImageView.image = nil
+        backgroundImagePath = nil
+        bgImageView.image = nil
     }
 
     private func loadStyleValues(_ style: NotificationStyle) {
@@ -579,6 +637,22 @@ class RuleEditorWindowController: NSWindowController {
         titleColorWell.color = colorFromHex(style.titleColorHex)
         subtitleColorWell.color = colorFromHex(style.subtitleColorHex)
         bodyColorWell.color = colorFromHex(style.bodyColorHex)
+
+        // Load custom icon
+        customIconPath = style.customIconPath
+        if let path = customIconPath, !path.isEmpty {
+            iconImageView.image = NSImage(contentsOfFile: path)
+        } else {
+            iconImageView.image = nil
+        }
+
+        // Load background image
+        backgroundImagePath = style.backgroundImagePath
+        if let path = backgroundImagePath, !path.isEmpty {
+            bgImageView.image = NSImage(contentsOfFile: path)
+        } else {
+            bgImageView.image = nil
+        }
     }
 
     private func rebuildStylePopup() {
@@ -683,6 +757,8 @@ class RuleEditorWindowController: NSWindowController {
         if hexFromColor(titleColorWell.color) != original.titleColorHex { return true }
         if hexFromColor(subtitleColorWell.color) != original.subtitleColorHex { return true }
         if hexFromColor(bodyColorWell.color) != original.bodyColorHex { return true }
+        if customIconPath != original.customIconPath { return true }
+        if backgroundImagePath != original.backgroundImagePath { return true }
 
         return false
     }
@@ -701,7 +777,45 @@ class RuleEditorWindowController: NSWindowController {
         style.titleColorHex = hexFromColor(titleColorWell.color)
         style.subtitleColorHex = hexFromColor(subtitleColorWell.color)
         style.bodyColorHex = hexFromColor(bodyColorWell.color)
+        style.customIconPath = customIconPath
+        style.backgroundImagePath = backgroundImagePath
         return style
+    }
+
+    @objc private func chooseIcon() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Choose an icon image for this notification style"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            customIconPath = url.path
+            iconImageView.image = NSImage(contentsOf: url)
+        }
+    }
+
+    @objc private func clearIcon() {
+        customIconPath = nil
+        iconImageView.image = nil
+    }
+
+    @objc private func chooseBackgroundImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Choose a background image for this notification style"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            backgroundImagePath = url.path
+            bgImageView.image = NSImage(contentsOf: url)
+        }
+    }
+
+    @objc private func clearBackgroundImage() {
+        backgroundImagePath = nil
+        bgImageView.image = nil
     }
 
     private func cornerToIndex(_ corner: String) -> Int {

@@ -54,6 +54,10 @@ class NotificationMonitor {
     private var cachedInitialNotifSize: CGSize?
     private var cachedInitialPadding: CGFloat?
 
+    // Track recently shown notifications to avoid duplicates but allow different content
+    private var recentNotifications: [(content: String, time: Date)] = []
+    private let dedupeWindow: TimeInterval = 0.5  // Ignore exact duplicates within 0.5 seconds
+
     init(position: NotificationPosition = .bottomRight, scaleFactor: CGFloat = 1.0) {
         self.targetPosition = position
         self.scaleFactor = scaleFactor
@@ -105,13 +109,15 @@ class NotificationMonitor {
         let app = AXUIElementCreateApplication(pid)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
 
-        // Watch for window creation and focus changes
+        // Watch for window creation, focus changes, and content updates
         let notifications = [
             kAXWindowCreatedNotification,
             kAXFocusedWindowChangedNotification,
             kAXUIElementDestroyedNotification,
             kAXMovedNotification,
-            kAXResizedNotification
+            kAXResizedNotification,
+            kAXValueChangedNotification,
+            kAXLayoutChangedNotification
         ]
 
         for notif in notifications {
@@ -162,8 +168,10 @@ class NotificationMonitor {
     }
 
     private func handleNotification(element: AXUIElement, notification: String) {
-        // For window creation, move the element directly like PingPlace does
-        if notification == kAXWindowCreatedNotification as String {
+        // For window creation or content changes, process the notification
+        if notification == kAXWindowCreatedNotification as String ||
+           notification == kAXValueChangedNotification as String ||
+           notification == kAXLayoutChangedNotification as String {
             moveNotificationPingPlaceStyle(element)
         }
     }
@@ -210,10 +218,23 @@ class NotificationMonitor {
         // Show custom notification based on rules (always check, regardless of position)
         let content = CustomNotificationManager.shared.extractContent(from: bannerContainer)
         if !content.title.isEmpty || !content.body.isEmpty {
-            if let style = RulesManager.shared.styleFor(content: content) {
-                let config = style.toConfig()
-                CustomNotificationManager.shared.configure(config)
-                CustomNotificationManager.shared.showNotification(content: content)
+            // Create a content hash for deduplication
+            let contentHash = "\(content.appName)|\(content.title)|\(content.subtitle)|\(content.body)"
+            let now = Date()
+
+            // Clean up old entries
+            recentNotifications.removeAll { now.timeIntervalSince($0.time) > dedupeWindow }
+
+            // Check if we've recently shown this exact notification
+            let isDuplicate = recentNotifications.contains { $0.content == contentHash }
+
+            if !isDuplicate {
+                if let style = RulesManager.shared.styleFor(content: content) {
+                    let config = style.toConfig()
+                    CustomNotificationManager.shared.configure(config)
+                    CustomNotificationManager.shared.showNotification(content: content)
+                    recentNotifications.append((content: contentHash, time: now))
+                }
             }
         }
     }
