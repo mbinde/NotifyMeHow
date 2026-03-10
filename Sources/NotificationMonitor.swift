@@ -46,17 +46,10 @@ class NotificationMonitor {
     private var scaleFactor: CGFloat
     private var showCustomNotification: Bool = false
     private var customConfig: CustomNotificationConfig?
-    private var seenBanners: Set<String> = []  // Track banners we've already processed
 
-    // Cached initial notification data (like PingPlace)
-    private var cachedInitialPosition: CGPoint?
-    private var cachedInitialWindowSize: CGSize?
-    private var cachedInitialNotifSize: CGSize?
-    private var cachedInitialPadding: CGFloat?
-
-    // Track recently shown notifications to avoid duplicates but allow different content
+    // Track recently shown notifications to avoid duplicates
     private var recentNotifications: [(content: String, time: Date)] = []
-    private let dedupeWindow: TimeInterval = 0.5  // Ignore exact duplicates within 0.5 seconds
+    private let dedupeWindow: TimeInterval = 0.5
 
     init(position: NotificationPosition = .bottomRight, scaleFactor: CGFloat = 1.0) {
         self.targetPosition = position
@@ -79,7 +72,6 @@ class NotificationMonitor {
     func start() {
         guard checkAccessibilityPermissions() else {
             print("ERROR: Accessibility permissions not granted.")
-            print("Please grant accessibility permissions in System Settings > Privacy & Security > Accessibility")
             return
         }
 
@@ -109,7 +101,7 @@ class NotificationMonitor {
         let app = AXUIElementCreateApplication(pid)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
 
-        // Watch for window creation, focus changes, and content updates
+        // Watch for window creation and content updates
         let notifications = [
             kAXWindowCreatedNotification,
             kAXFocusedWindowChangedNotification,
@@ -137,10 +129,9 @@ class NotificationMonitor {
         isRunning = true
         print("Notification monitor started.")
         print("Target position: \(targetPosition.corner), offset: (\(targetPosition.offsetX), \(targetPosition.offsetY))")
-        print("Scale factor: \(scaleFactor)")
 
-        // Also reposition any existing notification windows
-        repositionExistingNotifications()
+        // Reposition any existing notifications
+        repositionAllNotifications()
     }
 
     func stop() {
@@ -158,8 +149,7 @@ class NotificationMonitor {
 
     func setPosition(_ position: NotificationPosition) {
         targetPosition = position
-        print("Position updated to: \(position.corner)")
-        repositionExistingNotifications()
+        repositionAllNotifications()
     }
 
     func setScaleFactor(_ factor: CGFloat) {
@@ -167,77 +157,141 @@ class NotificationMonitor {
         print("Scale factor updated to: \(factor)")
     }
 
+    // MARK: - Notification Handling
+
     private func handleNotification(element: AXUIElement, notification: String) {
-        // For window creation or content changes, process the notification
         if notification == kAXWindowCreatedNotification as String ||
            notification == kAXValueChangedNotification as String ||
            notification == kAXLayoutChangedNotification as String {
-            moveNotificationPingPlaceStyle(element)
+            processNotificationWindow(element)
         }
     }
 
-    /// Move notification using PingPlace's approach - relative positioning on the window
-    private func moveNotificationPingPlaceStyle(_ window: AXUIElement) {
-        // Find the banner container within the window
+    /// Process a notification window - reposition it and optionally show custom notification
+    private func processNotificationWindow(_ window: AXUIElement) {
+        // Find the banner within the window
         let targetSubroles = ["AXNotificationCenterBanner", "AXNotificationCenterAlert"]
-        guard let windowSize = getSize(of: window),
-              let bannerContainer = findElementWithSubrole(window, targetSubroles: targetSubroles),
-              let notifSize = getSize(of: bannerContainer),
-              let position = getPosition(of: bannerContainer) else {
+        guard let banner = findElementWithSubrole(window, targetSubroles: targetSubroles) else {
             return
         }
 
-        // Reposition notification (skip if topRight - the default position)
-        let shouldReposition = !(targetPosition.corner == .topRight)
-        if shouldReposition {
-            // Cache initial data if not already cached
-            if cachedInitialPosition == nil {
-                cacheInitialNotificationData(windowSize: windowSize, notifSize: notifSize, position: position)
-            }
+        // Reposition the notification
+        repositionBanner(banner)
 
-            if let cachedPos = cachedInitialPosition,
-               let cachedWinSize = cachedInitialWindowSize,
-               let cachedNotifSize = cachedInitialNotifSize,
-               let cachedPad = cachedInitialPadding {
-                // Calculate new position as RELATIVE offset (like PingPlace does)
-                let newPosition = calculateNewPositionPingPlaceStyle(
-                    windowSize: cachedWinSize,
-                    notifSize: cachedNotifSize,
-                    position: cachedPos,
-                    padding: cachedPad
-                )
+        // Show custom notification if rules match
+        showCustomNotificationIfNeeded(from: banner)
+    }
 
-                // Set position directly on the window
-                var point = CGPoint(x: newPosition.x, y: newPosition.y)
-                if let value = AXValueCreate(.cgPoint, &point) {
-                    AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, value)
-                }
-            }
-        }
-
-        // Show custom notification based on rules (always check, regardless of position)
-        let content = CustomNotificationManager.shared.extractContent(from: bannerContainer)
-        if !content.title.isEmpty || !content.body.isEmpty {
-            // Create a content hash for deduplication
-            let contentHash = "\(content.appName)|\(content.title)|\(content.subtitle)|\(content.body)"
-            let now = Date()
-
-            // Clean up old entries
-            recentNotifications.removeAll { now.timeIntervalSince($0.time) > dedupeWindow }
-
-            // Check if we've recently shown this exact notification
-            let isDuplicate = recentNotifications.contains { $0.content == contentHash }
-
-            if !isDuplicate {
-                if let style = RulesManager.shared.styleFor(content: content) {
-                    let config = style.toConfig()
-                    CustomNotificationManager.shared.configure(config)
-                    CustomNotificationManager.shared.showNotification(content: content)
-                    recentNotifications.append((content: contentHash, time: now))
-                }
-            }
+    /// Reposition all currently visible notifications
+    func repositionAllNotifications() {
+        let banners = findNotificationBanners(verbose: false)
+        for banner in banners {
+            repositionBanner(banner)
         }
     }
+
+    // MARK: - Positioning Logic (single code path)
+
+    /// Reposition a notification banner to the target position
+    private func repositionBanner(_ banner: AXUIElement) {
+        guard let bannerPos = getPosition(of: banner),
+              let bannerSize = getSize(of: banner) else {
+            return
+        }
+
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.frame
+
+        // Calculate target position
+        let targetPoint = calculateTargetPosition(forSize: bannerSize, in: screenFrame)
+
+        // Check if already at target (avoid fighting with system)
+        let tolerance: CGFloat = 5.0
+        if abs(bannerPos.x - targetPoint.x) < tolerance && abs(bannerPos.y - targetPoint.y) < tolerance {
+            return
+        }
+
+        // Get the parent window - that's what we actually move
+        var windowRef: CFTypeRef?
+        let windowResult = AXUIElementCopyAttributeValue(banner, kAXWindowAttribute as CFString, &windowRef)
+        guard windowResult == .success, let window = windowRef else {
+            return
+        }
+        let windowElement = window as! AXUIElement
+
+        guard let windowPos = getPosition(of: windowElement) else {
+            return
+        }
+
+        // Calculate where window needs to be so banner lands at target
+        let bannerOffsetInWindow = CGPoint(
+            x: bannerPos.x - windowPos.x,
+            y: bannerPos.y - windowPos.y
+        )
+
+        let newWindowPos = CGPoint(
+            x: targetPoint.x - bannerOffsetInWindow.x,
+            y: targetPoint.y - bannerOffsetInWindow.y
+        )
+
+        _ = NotifyMeHow.setPosition(of: windowElement, to: newWindowPos)
+    }
+
+    /// Calculate the target screen position for a notification of given size
+    /// Note: Accessibility API uses screen coordinates where Y=0 is at TOP of screen
+    private func calculateTargetPosition(forSize size: CGSize, in screenFrame: CGRect) -> CGPoint {
+        var x: CGFloat
+        var y: CGFloat
+        let screenHeight = screenFrame.height
+
+        // Horizontal position
+        switch targetPosition.corner {
+        case .topRight, .middleRight, .bottomRight:
+            x = screenFrame.maxX - size.width - targetPosition.offsetX
+        case .topLeft, .middleLeft, .bottomLeft:
+            x = screenFrame.minX + targetPosition.offsetX
+        case .topCenter, .center, .bottomCenter:
+            x = screenFrame.midX - size.width / 2
+        }
+
+        // Vertical position (AX coordinates: Y=0 at top)
+        switch targetPosition.corner {
+        case .topLeft, .topCenter, .topRight:
+            y = targetPosition.offsetY
+        case .middleLeft, .center, .middleRight:
+            y = screenHeight / 2 - size.height / 2
+        case .bottomLeft, .bottomCenter, .bottomRight:
+            y = screenHeight - size.height - targetPosition.offsetY
+        }
+
+        return CGPoint(x: x, y: y)
+    }
+
+    // MARK: - Custom Notifications
+
+    private func showCustomNotificationIfNeeded(from banner: AXUIElement) {
+        let content = CustomNotificationManager.shared.extractContent(from: banner)
+        guard !content.title.isEmpty || !content.body.isEmpty else { return }
+
+        // Deduplicate
+        let contentHash = "\(content.appName)|\(content.title)|\(content.subtitle)|\(content.body)"
+        let now = Date()
+
+        recentNotifications.removeAll { now.timeIntervalSince($0.time) > dedupeWindow }
+
+        let isDuplicate = recentNotifications.contains { $0.content == contentHash }
+        guard !isDuplicate else { return }
+
+        // Check rules and show if matched
+        if let style = RulesManager.shared.styleFor(content: content) {
+            let config = style.toConfig()
+            CustomNotificationManager.shared.configure(config)
+            CustomNotificationManager.shared.showNotification(content: content)
+            recentNotifications.append((content: contentHash, time: now))
+        }
+    }
+
+    // MARK: - Helpers
 
     private func findElementWithSubrole(_ root: AXUIElement, targetSubroles: [String]) -> AXUIElement? {
         var subroleRef: CFTypeRef?
@@ -258,311 +312,5 @@ class NotificationMonitor {
             }
         }
         return nil
-    }
-
-    private func cacheInitialNotificationData(windowSize: CGSize, notifSize: CGSize, position: CGPoint) {
-        guard cachedInitialPosition == nil else { return }
-
-        guard let screen = NSScreen.main else { return }
-        let screenWidth = screen.frame.width
-
-        var padding: CGFloat
-        var effectivePosition = position
-
-        if position.x + notifSize.width > screenWidth {
-            padding = 16.0
-            effectivePosition.x = screenWidth - notifSize.width - padding
-        } else {
-            let rightEdge = position.x + notifSize.width
-            padding = screenWidth - rightEdge
-        }
-
-        cachedInitialPosition = effectivePosition
-        cachedInitialWindowSize = windowSize
-        cachedInitialNotifSize = notifSize
-        cachedInitialPadding = padding
-    }
-
-    private func calculateNewPositionPingPlaceStyle(
-        windowSize: CGSize,
-        notifSize: CGSize,
-        position: CGPoint,
-        padding: CGFloat
-    ) -> (x: CGFloat, y: CGFloat) {
-        var newX: CGFloat
-        var newY: CGFloat
-
-        guard let screen = NSScreen.main else { return (0, 0) }
-        let dockSize = screen.frame.height - screen.visibleFrame.height
-        let paddingAboveDock: CGFloat = 30
-
-        // Horizontal positioning (relative offset)
-        switch targetPosition.corner {
-        case .topLeft, .middleLeft, .bottomLeft:
-            newX = padding - position.x
-        case .topCenter, .center, .bottomCenter:
-            newX = (windowSize.width - notifSize.width) / 2 - position.x
-        case .topRight, .middleRight, .bottomRight:
-            newX = 0
-        }
-
-        // Vertical positioning (relative offset)
-        switch targetPosition.corner {
-        case .topLeft, .topCenter, .topRight:
-            newY = 0
-        case .middleLeft, .center, .middleRight:
-            newY = (windowSize.height - notifSize.height) / 2 - dockSize
-        case .bottomLeft, .bottomCenter, .bottomRight:
-            newY = windowSize.height - notifSize.height - dockSize - paddingAboveDock
-        }
-
-        return (newX, newY)
-    }
-
-    func repositionExistingNotifications() {
-        // Find actual notification banners (not just windows) using the correct subrole
-        let banners = findNotificationBanners(verbose: false)
-        if banners.isEmpty { return }
-
-        for (index, banner) in banners.enumerated() {
-            repositionBanner(banner, index: index)
-        }
-    }
-
-    private func repositionBanner(_ banner: AXUIElement, index: Int) {
-        guard let currentPos = getPosition(of: banner),
-              let currentSize = getSize(of: banner) else {
-            return
-        }
-
-        // Get screen dimensions
-        guard let screen = NSScreen.main else { return }
-        let screenFrame = screen.frame
-        let screenHeight = screenFrame.height
-
-        // Calculate new position based on target corner
-        var newX: CGFloat
-        var newY: CGFloat
-
-        switch targetPosition.corner {
-        case .topRight, .middleRight, .bottomRight:
-            newX = screenFrame.maxX - currentSize.width - targetPosition.offsetX
-        case .topLeft, .middleLeft, .bottomLeft:
-            newX = targetPosition.offsetX
-        case .topCenter, .center, .bottomCenter:
-            newX = screenFrame.midX - currentSize.width / 2
-        }
-
-        switch targetPosition.corner {
-        case .topLeft, .topCenter, .topRight:
-            newY = targetPosition.offsetY
-        case .middleLeft, .center, .middleRight:
-            newY = screenHeight / 2 - currentSize.height / 2
-        case .bottomLeft, .bottomCenter, .bottomRight:
-            newY = screenHeight - currentSize.height - targetPosition.offsetY
-        }
-
-        // Stack multiple notifications
-        let stackOffset = CGFloat(index) * (currentSize.height + 10)
-        switch targetPosition.corner {
-        case .topLeft, .topCenter, .topRight:
-            newY += stackOffset
-        case .bottomLeft, .bottomCenter, .bottomRight:
-            newY -= stackOffset
-        case .middleLeft, .center, .middleRight:
-            newY += stackOffset
-        }
-
-        let newPosition = CGPoint(x: newX, y: newY)
-
-        // Get the parent window - that's what we need to move
-        var windowRef: CFTypeRef?
-        let windowResult = AXUIElementCopyAttributeValue(banner, kAXWindowAttribute as CFString, &windowRef)
-        guard windowResult == .success, let window = windowRef else {
-            return
-        }
-
-        let windowElement = window as! AXUIElement
-
-        // Get window's current position and size
-        guard let windowPos = getPosition(of: windowElement),
-              let windowSize = getSize(of: windowElement) else {
-            return
-        }
-
-        // If this is the huge container window, we still move it but need to
-        // calculate based on where the banner is WITHIN the window
-        if windowSize.width > 500 || windowSize.height > 300 {
-            // The banner position within the window tells us where the notification actually is
-            // We need to offset the window so the banner ends up at our target
-            let bannerOffsetInWindow = CGPoint(
-                x: currentPos.x - windowPos.x,
-                y: currentPos.y - windowPos.y
-            )
-
-            // Check if banner is already at target (within tolerance)
-            let tolerance: CGFloat = 5.0
-            if abs(currentPos.x - newX) < tolerance && abs(currentPos.y - newY) < tolerance {
-                return
-            }
-
-            // Calculate where the window needs to be so the banner lands at our target
-            let adjustedWindowPos = CGPoint(
-                x: newX - bannerOffsetInWindow.x,
-                y: newY - bannerOffsetInWindow.y
-            )
-
-            _ = NotifyMeHow.setPosition(of: windowElement, to: adjustedWindowPos)
-            return
-        }
-
-        // Only move if not already at target (avoid fighting with ourselves)
-        let tolerance: CGFloat = 50
-        if abs(windowPos.x - newX) < tolerance && abs(windowPos.y - newY) < tolerance {
-            return
-        }
-
-        _ = NotifyMeHow.setPosition(of: windowElement, to: newPosition)
-    }
-
-    private func repositionWindow(_ window: AXUIElement, index: Int) {
-        guard let currentPos = getPosition(of: window),
-              let currentSize = getSize(of: window) else {
-            print("Could not get window position/size")
-            return
-        }
-
-        // Skip windows that are too large (likely the NC container, not a notification banner)
-        // Typical notification banners are around 350-400px wide and 80-120px tall
-        if currentSize.width > 500 || currentSize.height > 200 {
-            print("Window \(index): Skipping (too large: \(currentSize.width)x\(currentSize.height) - likely container)")
-            return
-        }
-
-        print("Window \(index): Current position (\(currentPos.x), \(currentPos.y)), size \(currentSize.width)x\(currentSize.height)")
-
-        // Try using CGS private API instead of accessibility API for the actual move
-        var usedCGS = false
-        if let windowID = getWindowID(from: window) {
-            print("  Window ID: \(windowID), trying CGS API...")
-            usedCGS = true
-        }
-
-        // Get screen dimensions
-        // Note: Accessibility API uses screen coordinates where Y=0 is at TOP-LEFT
-        // NSScreen uses Cocoa coordinates where Y=0 is at BOTTOM-LEFT
-        // We need to convert: AX_Y = screenHeight - Cocoa_Y - windowHeight
-        guard let screen = NSScreen.main else { return }
-        let screenFrame = screen.frame
-        let screenHeight = screenFrame.height
-
-        print("  Screen: \(screenFrame.width)x\(screenFrame.height), origin: (\(screenFrame.origin.x), \(screenFrame.origin.y))")
-
-        // Calculate new position based on target corner
-        // All Y values here are in Accessibility coordinates (0 at top)
-        var newX: CGFloat
-        var newY: CGFloat
-
-        // DEBUG: Try setting to absolute screen coordinates
-        // The notification is visually at top-right but AX reports x=20
-        // Let's try moving it to an obviously different spot
-        switch targetPosition.corner {
-        case .topRight, .middleRight, .bottomRight:
-            newX = screenFrame.maxX - currentSize.width - targetPosition.offsetX
-        case .topLeft, .middleLeft, .bottomLeft:
-            newX = targetPosition.offsetX
-        case .topCenter, .center, .bottomCenter:
-            newX = screenFrame.midX - currentSize.width / 2 + targetPosition.offsetX
-        }
-
-        switch targetPosition.corner {
-        case .topLeft, .topCenter, .topRight:
-            newY = targetPosition.offsetY
-        case .middleLeft, .center, .middleRight:
-            newY = screenHeight / 2 - currentSize.height / 2 + targetPosition.offsetY
-        case .bottomLeft, .bottomCenter, .bottomRight:
-            newY = screenHeight - currentSize.height - targetPosition.offsetY
-        }
-
-        print("  Attempting to move from (\(currentPos.x), \(currentPos.y)) to (\(newX), \(newY))")
-
-        // Stack multiple notifications vertically
-        let stackOffset = CGFloat(index) * (currentSize.height + 10)
-        switch targetPosition.corner {
-        case .topLeft, .topCenter, .topRight:
-            newY += stackOffset
-        case .bottomLeft, .bottomCenter, .bottomRight:
-            newY -= stackOffset
-        case .middleLeft, .center, .middleRight:
-            newY += stackOffset
-        }
-
-        let newPosition = CGPoint(x: newX, y: newY)
-        print("  Target position: (\(newX), \(newY))")
-
-        // Try CGS API first (more likely to work for system windows)
-        var moved = false
-        if let windowID = getWindowID(from: window) {
-            if moveWindowCGS(windowID: windowID, to: newPosition) {
-                print("  [CGS] Successfully moved window")
-                moved = true
-            } else {
-                print("  [CGS] Failed to move window")
-            }
-        }
-
-        // Fall back to accessibility API
-        if !moved {
-            if NotifyMeHow.setPosition(of: window, to: newPosition) {
-                print("  [AX] Successfully moved notification window")
-            } else {
-                print("  [AX] Failed to move notification window")
-            }
-        }
-
-        // Try to scale the notification if requested
-        if scaleFactor != 1.0 {
-            tryScaleWindow(window, scaleFactor: scaleFactor)
-        }
-    }
-
-    /// Try multiple approaches to scale a window
-    private func tryScaleWindow(_ window: AXUIElement, scaleFactor: CGFloat) {
-        print("Attempting to scale window by factor: \(scaleFactor)")
-
-        // Approach 1: Try accessibility API size change (usually fails for system windows)
-        if let currentSize = getSize(of: window) {
-            let newSize = CGSize(width: currentSize.width * scaleFactor, height: currentSize.height * scaleFactor)
-            if NotifyMeHow.setSize(of: window, to: newSize) {
-                print("  [AX API] Successfully resized notification window")
-                return
-            } else {
-                print("  [AX API] Could not resize via accessibility API")
-            }
-        }
-
-        // Approach 2: Try CGS private API transform
-        if let windowID = getWindowID(from: window) {
-            print("  [CGS API] Found window ID: \(windowID)")
-
-            // Try applying a scale transform
-            if applyScaleTransform(to: windowID, scale: scaleFactor, centerOnOriginal: true) {
-                print("  [CGS API] Successfully applied scale transform")
-                return
-            } else {
-                print("  [CGS API] Failed to apply scale transform")
-
-                // Note: CGS has a restriction that you can't scale UP past the original frame
-                // But we can try scaling DOWN if scale < 1.0
-                if scaleFactor > 1.0 {
-                    print("  [CGS API] Note: CGS restricts scaling UP past original window size")
-                    print("  [CGS API] Scaling DOWN (factor < 1.0) may work")
-                }
-            }
-        } else {
-            print("  [CGS API] Could not get window ID from accessibility element")
-        }
-
-        print("  All scaling approaches failed - notification windows may not support resizing")
     }
 }

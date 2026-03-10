@@ -255,6 +255,13 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
     // MARK: - NSTextFieldDelegate
 
     func controlTextDidChange(_ obj: Notification) {
+        // Save offset changes as user types
+        if let x = Double(offsetXField.stringValue) {
+            settings.positionOffsetX = CGFloat(x)
+        }
+        if let y = Double(offsetYField.stringValue) {
+            settings.positionOffsetY = CGFloat(y)
+        }
         validateOffsets()
     }
 
