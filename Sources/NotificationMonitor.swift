@@ -9,19 +9,33 @@ enum NotificationMode {
 
 /// Configuration for where to place notifications
 struct NotificationPosition {
-    enum Corner {
-        case topLeft, topRight, bottomLeft, bottomRight, center
+    enum Corner: String {
+        case topLeft = "topLeft"
+        case topCenter = "topCenter"
+        case topRight = "topRight"
+        case middleLeft = "middleLeft"
+        case center = "center"
+        case middleRight = "middleRight"
+        case bottomLeft = "bottomLeft"
+        case bottomCenter = "bottomCenter"
+        case bottomRight = "bottomRight"
     }
 
     var corner: Corner
     var offsetX: CGFloat
     var offsetY: CGFloat
 
-    static let defaultTopRight = NotificationPosition(corner: .topRight, offsetX: 20, offsetY: 40)
-    static let bottomRight = NotificationPosition(corner: .bottomRight, offsetX: 20, offsetY: 20)
-    static let bottomLeft = NotificationPosition(corner: .bottomLeft, offsetX: 20, offsetY: 20)
     static let topLeft = NotificationPosition(corner: .topLeft, offsetX: 20, offsetY: 40)
+    static let topCenter = NotificationPosition(corner: .topCenter, offsetX: 0, offsetY: 40)
+    static let topRight = NotificationPosition(corner: .topRight, offsetX: 20, offsetY: 40)
+    static let middleLeft = NotificationPosition(corner: .middleLeft, offsetX: 20, offsetY: 0)
     static let center = NotificationPosition(corner: .center, offsetX: 0, offsetY: 0)
+    static let middleRight = NotificationPosition(corner: .middleRight, offsetX: 20, offsetY: 0)
+    static let bottomLeft = NotificationPosition(corner: .bottomLeft, offsetX: 20, offsetY: 20)
+    static let bottomCenter = NotificationPosition(corner: .bottomCenter, offsetX: 0, offsetY: 20)
+    static let bottomRight = NotificationPosition(corner: .bottomRight, offsetX: 20, offsetY: 20)
+
+    static let defaultTopRight = topRight
 }
 
 /// Monitors for notification windows and repositions them
@@ -50,6 +64,12 @@ class NotificationMonitor {
         self.showCustomNotification = true
         self.customConfig = config
         CustomNotificationManager.shared.configure(config)
+    }
+
+    /// Disable custom notifications
+    func disableCustomNotifications() {
+        self.showCustomNotification = false
+        self.customConfig = nil
     }
 
     func start() {
@@ -150,9 +170,6 @@ class NotificationMonitor {
 
     /// Move notification using PingPlace's approach - relative positioning on the window
     private func moveNotificationPingPlaceStyle(_ window: AXUIElement) {
-        // Skip if topRight (default position)
-        if case .topRight = targetPosition.corner { return }
-
         // Find the banner container within the window
         let targetSubroles = ["AXNotificationCenterBanner", "AXNotificationCenterAlert"]
         guard let windowSize = getSize(of: window),
@@ -162,34 +179,40 @@ class NotificationMonitor {
             return
         }
 
-        // Cache initial data if not already cached
-        if cachedInitialPosition == nil {
-            cacheInitialNotificationData(windowSize: windowSize, notifSize: notifSize, position: position)
+        // Reposition notification (skip if topRight - the default position)
+        let shouldReposition = !(targetPosition.corner == .topRight)
+        if shouldReposition {
+            // Cache initial data if not already cached
+            if cachedInitialPosition == nil {
+                cacheInitialNotificationData(windowSize: windowSize, notifSize: notifSize, position: position)
+            }
+
+            if let cachedPos = cachedInitialPosition,
+               let cachedWinSize = cachedInitialWindowSize,
+               let cachedNotifSize = cachedInitialNotifSize,
+               let cachedPad = cachedInitialPadding {
+                // Calculate new position as RELATIVE offset (like PingPlace does)
+                let newPosition = calculateNewPositionPingPlaceStyle(
+                    windowSize: cachedWinSize,
+                    notifSize: cachedNotifSize,
+                    position: cachedPos,
+                    padding: cachedPad
+                )
+
+                // Set position directly on the window
+                var point = CGPoint(x: newPosition.x, y: newPosition.y)
+                if let value = AXValueCreate(.cgPoint, &point) {
+                    AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, value)
+                }
+            }
         }
 
-        guard let cachedPos = cachedInitialPosition,
-              let cachedWinSize = cachedInitialWindowSize,
-              let cachedNotifSize = cachedInitialNotifSize,
-              let cachedPad = cachedInitialPadding else { return }
-
-        // Calculate new position as RELATIVE offset (like PingPlace does)
-        let newPosition = calculateNewPositionPingPlaceStyle(
-            windowSize: cachedWinSize,
-            notifSize: cachedNotifSize,
-            position: cachedPos,
-            padding: cachedPad
-        )
-
-        // Set position directly on the window
-        var point = CGPoint(x: newPosition.x, y: newPosition.y)
-        if let value = AXValueCreate(.cgPoint, &point) {
-            AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, value)
-        }
-
-        // Show custom notification if enabled
-        if showCustomNotification {
-            let content = CustomNotificationManager.shared.extractContent(from: bannerContainer)
-            if !content.title.isEmpty || !content.body.isEmpty {
+        // Show custom notification based on rules (always check, regardless of position)
+        let content = CustomNotificationManager.shared.extractContent(from: bannerContainer)
+        if !content.title.isEmpty || !content.body.isEmpty {
+            if let style = RulesManager.shared.styleFor(content: content) {
+                let config = style.toConfig()
+                CustomNotificationManager.shared.configure(config)
                 CustomNotificationManager.shared.showNotification(content: content)
             }
         }
@@ -254,21 +277,21 @@ class NotificationMonitor {
 
         // Horizontal positioning (relative offset)
         switch targetPosition.corner {
-        case .topLeft, .bottomLeft:
+        case .topLeft, .middleLeft, .bottomLeft:
             newX = padding - position.x
-        case .center:
+        case .topCenter, .center, .bottomCenter:
             newX = (windowSize.width - notifSize.width) / 2 - position.x
-        case .topRight, .bottomRight:
+        case .topRight, .middleRight, .bottomRight:
             newX = 0
         }
 
         // Vertical positioning (relative offset)
         switch targetPosition.corner {
-        case .topLeft, .topRight:
+        case .topLeft, .topCenter, .topRight:
             newY = 0
-        case .center:
+        case .middleLeft, .center, .middleRight:
             newY = (windowSize.height - notifSize.height) / 2 - dockSize
-        case .bottomLeft, .bottomRight:
+        case .bottomLeft, .bottomCenter, .bottomRight:
             newY = windowSize.height - notifSize.height - dockSize - paddingAboveDock
         }
 
@@ -301,31 +324,31 @@ class NotificationMonitor {
         var newY: CGFloat
 
         switch targetPosition.corner {
-        case .topRight:
+        case .topRight, .middleRight, .bottomRight:
             newX = screenFrame.maxX - currentSize.width - targetPosition.offsetX
-            newY = targetPosition.offsetY
-        case .topLeft:
+        case .topLeft, .middleLeft, .bottomLeft:
             newX = targetPosition.offsetX
-            newY = targetPosition.offsetY
-        case .bottomRight:
-            newX = screenFrame.maxX - currentSize.width - targetPosition.offsetX
-            newY = screenHeight - currentSize.height - targetPosition.offsetY
-        case .bottomLeft:
-            newX = targetPosition.offsetX
-            newY = screenHeight - currentSize.height - targetPosition.offsetY
-        case .center:
+        case .topCenter, .center, .bottomCenter:
             newX = screenFrame.midX - currentSize.width / 2
+        }
+
+        switch targetPosition.corner {
+        case .topLeft, .topCenter, .topRight:
+            newY = targetPosition.offsetY
+        case .middleLeft, .center, .middleRight:
             newY = screenHeight / 2 - currentSize.height / 2
+        case .bottomLeft, .bottomCenter, .bottomRight:
+            newY = screenHeight - currentSize.height - targetPosition.offsetY
         }
 
         // Stack multiple notifications
         let stackOffset = CGFloat(index) * (currentSize.height + 10)
         switch targetPosition.corner {
-        case .topLeft, .topRight:
+        case .topLeft, .topCenter, .topRight:
             newY += stackOffset
-        case .bottomLeft, .bottomRight:
+        case .bottomLeft, .bottomCenter, .bottomRight:
             newY -= stackOffset
-        case .center:
+        case .middleLeft, .center, .middleRight:
             newY += stackOffset
         }
 
@@ -368,7 +391,7 @@ class NotificationMonitor {
                 y: newY - bannerOffsetInWindow.y
             )
 
-            _ = NotifyMeHow.setPosition(of: windowElement, to: adjustedWindowPos)
+            _ = notifymehow.setPosition(of: windowElement, to: adjustedWindowPos)
             return
         }
 
@@ -378,7 +401,7 @@ class NotificationMonitor {
             return
         }
 
-        _ = NotifyMeHow.setPosition(of: windowElement, to: newPosition)
+        _ = notifymehow.setPosition(of: windowElement, to: newPosition)
     }
 
     private func repositionWindow(_ window: AXUIElement, index: Int) {
@@ -423,22 +446,21 @@ class NotificationMonitor {
         // The notification is visually at top-right but AX reports x=20
         // Let's try moving it to an obviously different spot
         switch targetPosition.corner {
-        case .topRight:
+        case .topRight, .middleRight, .bottomRight:
             newX = screenFrame.maxX - currentSize.width - targetPosition.offsetX
-            newY = targetPosition.offsetY
-        case .topLeft:
-            newX = targetPosition.offsetX  // Left edge + offset
-            newY = targetPosition.offsetY
-        case .bottomRight:
-            newX = screenFrame.maxX - currentSize.width - targetPosition.offsetX
-            newY = screenHeight - currentSize.height - targetPosition.offsetY
-        case .bottomLeft:
-            // Try absolute coordinates: left side of screen, near bottom
-            newX = 100  // Obviously left side
-            newY = 700  // Lower on screen (AX coords: 0=top)
-        case .center:
+        case .topLeft, .middleLeft, .bottomLeft:
+            newX = targetPosition.offsetX
+        case .topCenter, .center, .bottomCenter:
             newX = screenFrame.midX - currentSize.width / 2 + targetPosition.offsetX
+        }
+
+        switch targetPosition.corner {
+        case .topLeft, .topCenter, .topRight:
+            newY = targetPosition.offsetY
+        case .middleLeft, .center, .middleRight:
             newY = screenHeight / 2 - currentSize.height / 2 + targetPosition.offsetY
+        case .bottomLeft, .bottomCenter, .bottomRight:
+            newY = screenHeight - currentSize.height - targetPosition.offsetY
         }
 
         print("  Attempting to move from (\(currentPos.x), \(currentPos.y)) to (\(newX), \(newY))")
@@ -446,11 +468,11 @@ class NotificationMonitor {
         // Stack multiple notifications vertically
         let stackOffset = CGFloat(index) * (currentSize.height + 10)
         switch targetPosition.corner {
-        case .topLeft, .topRight:
+        case .topLeft, .topCenter, .topRight:
             newY += stackOffset
-        case .bottomLeft, .bottomRight:
+        case .bottomLeft, .bottomCenter, .bottomRight:
             newY -= stackOffset
-        case .center:
+        case .middleLeft, .center, .middleRight:
             newY += stackOffset
         }
 
@@ -470,7 +492,7 @@ class NotificationMonitor {
 
         // Fall back to accessibility API
         if !moved {
-            if NotifyMeHow.setPosition(of: window, to: newPosition) {
+            if notifymehow.setPosition(of: window, to: newPosition) {
                 print("  [AX] Successfully moved notification window")
             } else {
                 print("  [AX] Failed to move notification window")
@@ -490,7 +512,7 @@ class NotificationMonitor {
         // Approach 1: Try accessibility API size change (usually fails for system windows)
         if let currentSize = getSize(of: window) {
             let newSize = CGSize(width: currentSize.width * scaleFactor, height: currentSize.height * scaleFactor)
-            if NotifyMeHow.setSize(of: window, to: newSize) {
+            if notifymehow.setSize(of: window, to: newSize) {
                 print("  [AX API] Successfully resized notification window")
                 return
             } else {

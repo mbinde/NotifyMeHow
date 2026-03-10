@@ -1,0 +1,265 @@
+import Cocoa
+
+/// Preferences window controller
+class PreferencesWindowController: NSWindowController {
+    static let shared = PreferencesWindowController()
+
+    private var generalTab: GeneralPreferencesView?
+    private var rulesTab: RulesPreferencesView?
+    private var stylesTab: StylesPreferencesView?
+
+    private init() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 320),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "NotifyMeHow - Advanced Settings"
+        window.center()
+
+        super.init(window: window)
+
+        // Create tab view
+        let tabView = NSTabView(frame: NSRect(x: 0, y: 0, width: 480, height: 320))
+        tabView.autoresizingMask = [.width, .height]
+
+        // General tab
+        let generalItem = NSTabViewItem(identifier: "general")
+        generalItem.label = "General"
+        generalTab = GeneralPreferencesView(frame: NSRect(x: 0, y: 0, width: 460, height: 270))
+        generalItem.view = generalTab
+        tabView.addTabViewItem(generalItem)
+
+        // Rules tab
+        let rulesItem = NSTabViewItem(identifier: "rules")
+        rulesItem.label = "Rules"
+        rulesTab = RulesPreferencesView(frame: NSRect(x: 0, y: 0, width: 460, height: 270))
+        rulesItem.view = rulesTab
+        tabView.addTabViewItem(rulesItem)
+
+        // Styles tab
+        let stylesItem = NSTabViewItem(identifier: "styles")
+        stylesItem.label = "Styles"
+        stylesTab = StylesPreferencesView(frame: NSRect(x: 0, y: 0, width: 460, height: 270))
+        stylesItem.view = stylesTab
+        tabView.addTabViewItem(stylesItem)
+
+        window.contentView = tabView
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func showWindow() {
+        generalTab?.loadSettings()
+        rulesTab?.loadRules()
+        stylesTab?.loadStyles()
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+// MARK: - General Preferences Tab
+
+class GeneralPreferencesView: NSView {
+    private let settings = Settings.shared
+
+    private var positionPopup: NSPopUpButton!
+    private var offsetXField: NSTextField!
+    private var offsetYField: NSTextField!
+    private var autoStartCheckbox: NSButton!
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        let padding: CGFloat = 20
+        var y = frame.height - padding
+
+        // Position
+        y -= 25
+        let positionHeader = createLabel("Notification Position", bold: true)
+        positionHeader.frame = NSRect(x: padding, y: y, width: 200, height: 20)
+        addSubview(positionHeader)
+
+        y -= 30
+        let positionLabel = createLabel("Position:")
+        positionLabel.frame = NSRect(x: padding, y: y, width: 80, height: 22)
+        addSubview(positionLabel)
+
+        positionPopup = NSPopUpButton(frame: NSRect(x: padding + 90, y: y, width: 150, height: 26), pullsDown: false)
+        positionPopup.addItems(withTitles: [
+            "Top Left", "Top Center", "Top Right",
+            "Middle Left", "Center", "Middle Right",
+            "Bottom Left", "Bottom Center", "Bottom Right"
+        ])
+        positionPopup.target = self
+        positionPopup.action = #selector(positionChanged)
+        addSubview(positionPopup)
+
+        y -= 30
+        let offsetLabel = createLabel("Fine-tune:")
+        offsetLabel.frame = NSRect(x: padding, y: y, width: 80, height: 22)
+        addSubview(offsetLabel)
+
+        let offsetXLabel = createLabel("X:")
+        offsetXLabel.frame = NSRect(x: padding + 70, y: y, width: 20, height: 22)
+        addSubview(offsetXLabel)
+
+        offsetXField = NSTextField(frame: NSRect(x: padding + 90, y: y, width: 50, height: 22))
+        offsetXField.placeholderString = "20"
+        offsetXField.target = self
+        offsetXField.action = #selector(offsetChanged)
+        addSubview(offsetXField)
+
+        let offsetYLabel = createLabel("Y:")
+        offsetYLabel.frame = NSRect(x: padding + 150, y: y, width: 20, height: 22)
+        addSubview(offsetYLabel)
+
+        offsetYField = NSTextField(frame: NSRect(x: padding + 170, y: y, width: 50, height: 22))
+        offsetYField.placeholderString = "40"
+        offsetYField.target = self
+        offsetYField.action = #selector(offsetChanged)
+        addSubview(offsetYField)
+
+        let pxLabel = createLabel("px")
+        pxLabel.frame = NSRect(x: padding + 225, y: y, width: 20, height: 22)
+        addSubview(pxLabel)
+
+        // App Settings
+        y -= 40
+        let appHeader = createLabel("App Settings", bold: true)
+        appHeader.frame = NSRect(x: padding, y: y, width: 200, height: 20)
+        addSubview(appHeader)
+
+        y -= 30
+        autoStartCheckbox = NSButton(checkboxWithTitle: "Start monitoring automatically when app launches", target: self, action: #selector(autoStartChanged))
+        autoStartCheckbox.frame = NSRect(x: padding, y: y, width: 350, height: 22)
+        addSubview(autoStartCheckbox)
+
+        // Export/Import
+        y -= 40
+        let configHeader = createLabel("Configuration", bold: true)
+        configHeader.frame = NSRect(x: padding, y: y, width: 200, height: 20)
+        addSubview(configHeader)
+
+        y -= 35
+        let exportButton = NSButton(title: "Export Settings...", target: self, action: #selector(exportSettings))
+        exportButton.bezelStyle = .rounded
+        exportButton.frame = NSRect(x: padding, y: y, width: 130, height: 28)
+        addSubview(exportButton)
+
+        let importButton = NSButton(title: "Import Settings...", target: self, action: #selector(importSettings))
+        importButton.bezelStyle = .rounded
+        importButton.frame = NSRect(x: padding + 145, y: y, width: 130, height: 28)
+        addSubview(importButton)
+    }
+
+    private func createLabel(_ text: String, bold: Bool = false) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.font = bold ? NSFont.boldSystemFont(ofSize: 13) : NSFont.systemFont(ofSize: 13)
+        label.isBezeled = false
+        label.drawsBackground = false
+        label.isEditable = false
+        label.isSelectable = false
+        return label
+    }
+
+    func loadSettings() {
+        positionPopup.selectItem(at: cornerToIndex(settings.positionCorner))
+        offsetXField.stringValue = String(Int(settings.positionOffsetX))
+        offsetYField.stringValue = String(Int(settings.positionOffsetY))
+        autoStartCheckbox.state = settings.autoStartMonitoring ? .on : .off
+    }
+
+    private func cornerToIndex(_ corner: NotificationPosition.Corner) -> Int {
+        switch corner {
+        case .topLeft: return 0
+        case .topCenter: return 1
+        case .topRight: return 2
+        case .middleLeft: return 3
+        case .center: return 4
+        case .middleRight: return 5
+        case .bottomLeft: return 6
+        case .bottomCenter: return 7
+        case .bottomRight: return 8
+        }
+    }
+
+    private func indexToCorner(_ index: Int) -> NotificationPosition.Corner {
+        switch index {
+        case 0: return .topLeft
+        case 1: return .topCenter
+        case 2: return .topRight
+        case 3: return .middleLeft
+        case 4: return .center
+        case 5: return .middleRight
+        case 6: return .bottomLeft
+        case 7: return .bottomCenter
+        case 8: return .bottomRight
+        default: return .topRight
+        }
+    }
+
+    @objc private func positionChanged() {
+        settings.positionCorner = indexToCorner(positionPopup.indexOfSelectedItem)
+    }
+
+    @objc private func offsetChanged() {
+        if let x = Double(offsetXField.stringValue) {
+            settings.positionOffsetX = CGFloat(x)
+        }
+        if let y = Double(offsetYField.stringValue) {
+            settings.positionOffsetY = CGFloat(y)
+        }
+    }
+
+    @objc private func autoStartChanged() {
+        settings.autoStartMonitoring = autoStartCheckbox.state == .on
+    }
+
+    @objc private func exportSettings() {
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.json]
+        savePanel.nameFieldStringValue = "notifymehow-settings.json"
+
+        savePanel.beginSheetModal(for: window!) { response in
+            if response == .OK, let url = savePanel.url {
+                if let data = self.settings.exportToJSON() {
+                    try? data.write(to: url)
+                }
+            }
+        }
+    }
+
+    @objc private func importSettings() {
+        let openPanel = NSOpenPanel()
+        openPanel.allowedContentTypes = [.json]
+        openPanel.allowsMultipleSelection = false
+
+        openPanel.beginSheetModal(for: window!) { response in
+            if response == .OK, let url = openPanel.url {
+                if let data = try? Data(contentsOf: url) {
+                    if self.settings.importFromJSON(data) {
+                        self.loadSettings()
+                    } else {
+                        let alert = NSAlert()
+                        alert.messageText = "Import Failed"
+                        alert.informativeText = "Could not parse the settings file."
+                        alert.alertStyle = .warning
+                        alert.runModal()
+                    }
+                }
+            }
+        }
+    }
+}
+

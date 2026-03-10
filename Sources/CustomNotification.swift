@@ -4,6 +4,7 @@ import ApplicationServices
 /// Configuration for custom notification appearance
 struct CustomNotificationConfig {
     var backgroundColor: NSColor = NSColor.black.withAlphaComponent(0.85)
+    var appColor: NSColor = NSColor.white.withAlphaComponent(0.6)
     var titleColor: NSColor = .white
     var subtitleColor: NSColor = NSColor.white.withAlphaComponent(0.8)
     var bodyColor: NSColor = NSColor.white.withAlphaComponent(0.7)
@@ -134,7 +135,7 @@ class CustomNotificationManager {
             let appLabel = createLabel(
                 text: content.appName.uppercased(),
                 fontSize: config.subtitleFontSize * config.scaleFactor * 0.8,
-                color: config.subtitleColor.withAlphaComponent(0.6),
+                color: config.appColor,
                 width: textWidth
             )
             labels.append(appLabel)
@@ -251,32 +252,34 @@ class CustomNotificationManager {
         var x: CGFloat
         var y: CGFloat
 
+        // Horizontal position
         switch config.position.corner {
-        case .topRight:
+        case .topRight, .middleRight, .bottomRight:
             x = screenFrame.maxX - windowFrame.width - config.position.offsetX
-            y = screenFrame.maxY - windowFrame.height - config.position.offsetY
-        case .topLeft:
+        case .topLeft, .middleLeft, .bottomLeft:
             x = screenFrame.minX + config.position.offsetX
-            y = screenFrame.maxY - windowFrame.height - config.position.offsetY
-        case .bottomRight:
-            x = screenFrame.maxX - windowFrame.width - config.position.offsetX
-            y = screenFrame.minY + config.position.offsetY
-        case .bottomLeft:
-            x = screenFrame.minX + config.position.offsetX
-            y = screenFrame.minY + config.position.offsetY
-        case .center:
+        case .topCenter, .center, .bottomCenter:
             x = screenFrame.midX - windowFrame.width / 2
+        }
+
+        // Vertical position
+        switch config.position.corner {
+        case .topLeft, .topCenter, .topRight:
+            y = screenFrame.maxY - windowFrame.height - config.position.offsetY
+        case .middleLeft, .center, .middleRight:
             y = screenFrame.midY - windowFrame.height / 2
+        case .bottomLeft, .bottomCenter, .bottomRight:
+            y = screenFrame.minY + config.position.offsetY
         }
 
         // Stack multiple notifications
         let stackOffset = CGFloat(activeWindows.count - 1) * (windowFrame.height + 10)
         switch config.position.corner {
-        case .topLeft, .topRight:
+        case .topLeft, .topCenter, .topRight:
             y -= stackOffset
-        case .bottomLeft, .bottomRight:
+        case .bottomLeft, .bottomCenter, .bottomRight:
             y += stackOffset
-        case .center:
+        case .middleLeft, .center, .middleRight:
             y -= stackOffset
         }
 

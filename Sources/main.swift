@@ -106,16 +106,24 @@ func parseArguments() -> ParsedArgs {
 
 func parsePosition(_ str: String) -> NotificationPosition {
     switch str.lowercased() {
-    case "top-right", "tr":
-        return NotificationPosition(corner: .topRight, offsetX: 20, offsetY: 40)
     case "top-left", "tl":
         return NotificationPosition(corner: .topLeft, offsetX: 20, offsetY: 40)
-    case "bottom-right", "br":
-        return NotificationPosition(corner: .bottomRight, offsetX: 20, offsetY: 20)
-    case "bottom-left", "bl":
-        return NotificationPosition(corner: .bottomLeft, offsetX: 20, offsetY: 20)
+    case "top-center", "tc":
+        return NotificationPosition(corner: .topCenter, offsetX: 0, offsetY: 40)
+    case "top-right", "tr":
+        return NotificationPosition(corner: .topRight, offsetX: 20, offsetY: 40)
+    case "middle-left", "ml":
+        return NotificationPosition(corner: .middleLeft, offsetX: 20, offsetY: 0)
     case "center", "c":
         return NotificationPosition(corner: .center, offsetX: 0, offsetY: 0)
+    case "middle-right", "mr":
+        return NotificationPosition(corner: .middleRight, offsetX: 20, offsetY: 0)
+    case "bottom-left", "bl":
+        return NotificationPosition(corner: .bottomLeft, offsetX: 20, offsetY: 20)
+    case "bottom-center", "bc":
+        return NotificationPosition(corner: .bottomCenter, offsetX: 0, offsetY: 20)
+    case "bottom-right", "br":
+        return NotificationPosition(corner: .bottomRight, offsetX: 20, offsetY: 20)
     default:
         print("Unknown position: \(str), using bottom-right")
         return .bottomRight
