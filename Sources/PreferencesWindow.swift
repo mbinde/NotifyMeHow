@@ -161,14 +161,18 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
         addSubview(configHeader)
 
         y -= 35
-        let exportButton = NSButton(title: "Export Settings...", target: self, action: #selector(exportSettings))
+        let exportButton = NSButton(frame: NSRect(x: padding, y: y, width: 130, height: 28))
+        exportButton.title = "Export Settings..."
         exportButton.bezelStyle = .rounded
-        exportButton.frame = NSRect(x: padding, y: y, width: 130, height: 28)
+        exportButton.target = self
+        exportButton.action = #selector(exportSettings)
         addSubview(exportButton)
 
-        let importButton = NSButton(title: "Import Settings...", target: self, action: #selector(importSettings))
+        let importButton = NSButton(frame: NSRect(x: padding + 145, y: y, width: 130, height: 28))
+        importButton.title = "Import Settings..."
         importButton.bezelStyle = .rounded
-        importButton.frame = NSRect(x: padding + 145, y: y, width: 130, height: 28)
+        importButton.target = self
+        importButton.action = #selector(importSettings)
         addSubview(importButton)
     }
 
@@ -286,29 +290,48 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
     }
 
     @objc private func exportSettings() {
+        guard let window = self.window else {
+            print("Export: No window available")
+            return
+        }
+
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.json]
-        savePanel.nameFieldStringValue = "notifymehow-settings.json"
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: Date())
+        savePanel.nameFieldStringValue = "notifymehow-settings-\(dateString).json"
 
-        savePanel.beginSheetModal(for: window!) { response in
+        savePanel.beginSheetModal(for: window) { response in
             if response == .OK, let url = savePanel.url {
                 if let data = self.settings.exportToJSON() {
-                    try? data.write(to: url)
+                    do {
+                        try data.write(to: url)
+                    } catch {
+                        print("Export failed: \(error)")
+                    }
                 }
             }
         }
     }
 
     @objc private func importSettings() {
+        guard let window = self.window else {
+            print("Import: No window available")
+            return
+        }
+
         let openPanel = NSOpenPanel()
         openPanel.allowedContentTypes = [.json]
         openPanel.allowsMultipleSelection = false
 
-        openPanel.beginSheetModal(for: window!) { response in
+        openPanel.beginSheetModal(for: window) { response in
             if response == .OK, let url = openPanel.url {
                 if let data = try? Data(contentsOf: url) {
                     if self.settings.importFromJSON(data) {
                         self.loadSettings()
+                        // Also reload other tabs
+                        NotificationCenter.default.post(name: StylesManager.didChangeNotification, object: nil)
                     } else {
                         let alert = NSAlert()
                         alert.messageText = "Import Failed"
