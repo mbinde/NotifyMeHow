@@ -1,66 +1,62 @@
 # NotifyMeHow
 
-A macOS utility to customize notification position and appearance.
+A macOS menu bar app that lets you customize how notifications appear on your screen.
+
+## Why?
+
+macOS notifications are easy to miss. They appear briefly in the corner, look the same whether it's a routine update or something urgent, and disappear before you notice them. Apps give you limited control: maybe an option for sounds or banners, but nothing that truly makes important notifications stand out.
+
+NotifyMeHow fixes this. You can create rules that match notifications by app name or keywords, then apply custom styles that make them impossible to miss: larger size, different colors, screen-center positioning, attention-grabbing animations. When you enable "hide system notification," your custom notification completely replaces the default one—giving you full control over how that notification looks and behaves.
+
+**Some examples:**
+- Make Slack messages containing "urgent" or your name appear as large, red notifications in the center of your screen
+- Keep routine notifications subtle while critical alerts demand attention
+- Add pulsing or bouncing animations to notifications that need immediate action
 
 ## Features
 
-- **Move notifications** to any corner or center of the screen
-- **Custom duplicate notifications** with full control over:
-  - Position
-  - Size (scale factor)
-  - Opacity
-  - Background color
-  - Dwell time
+NotifyMeHow can reposition system notifications to any corner or center of the screen. It also creates custom notification styles where you control position, size (0.5x to 3x scale), colors, opacity, display duration, icons, background images, and animations.
 
-## Requirements
+The rule system matches notifications by app name or keywords in the title and body. You can require all keywords to match or just any one of them. When a rule matches, it applies your chosen style—and if you've enabled "hide system notification," the default notification disappears entirely, replaced by your custom version.
 
-- macOS (tested on macOS Tahoe 26.x)
-- Accessibility permissions
+Settings can be exported and imported, so you can back up your configuration or share it across machines.
 
-## Building
+## Installation
+
+### From Source
 
 ```bash
-swift build
-codesign --force --sign - --entitlements entitlements.plist .build/debug/NotifyMeHow
+git clone https://github.com/yourusername/notifymehow.git
+cd notifymehow
+./create-app.sh
+open NotifyMeHow.app
 ```
+
+### First Run
+
+Launch the app and it appears as an icon in your menu bar. macOS will prompt you to grant Accessibility permissions. Open **System Settings > Privacy & Security > Accessibility** and enable NotifyMeHow, then click "Start Monitoring" from the menu.
 
 ## Usage
 
-```bash
-# Move notifications to bottom-left
-NotifyMeHow -p bottom-left
+### Repositioning Notifications
 
-# Move to center
-NotifyMeHow -p center
+Select **Reposition To** from the menu to move all system notifications to a different location.
 
-# Show custom larger notification alongside the original
-NotifyMeHow -p center -c -cp bottom-left -cs 2.0 -cc purple
-```
+### Creating Custom Styles
 
-### Options
+Open **Custom Notification Styles** from the menu, go to the **Styles** tab, and click **Add Style**. Configure the appearance to your liking. Enable **Hide system notification** if you want your custom notification to replace the default entirely.
 
-**Position Options:**
-- `-p, --position <pos>` - Set notification position (tr, tl, br, bl, center)
-- `-ox, --offset-x <val>` - Horizontal offset from edge
-- `-oy, --offset-y <val>` - Vertical offset from edge
+### Setting Up Rules
 
-**Custom Notification Options:**
-- `-c, --custom` - Enable custom duplicate notification
-- `-cp, --custom-position` - Position for custom notification
-- `-cs, --custom-scale` - Scale factor (default: 1.5)
-- `-co, --custom-opacity` - Opacity 0.0-1.0 (default: 0.95)
-- `-cd, --custom-dwell` - Display duration in seconds (default: 5.0)
-- `-cc, --custom-color` - Background color (hex or name: black, white, blue, red, green, purple, orange)
+In the **Rules** tab, click **Add Rule**. Set the app name and/or keywords to match, choose whether any keyword or all keywords must match, and select which style to apply. Rules are evaluated in order—the first match wins.
 
-**Other Options:**
-- `-g, --gui` - Run as menu bar application
-- `-d, --debug` - Print debug information
-- `-h, --help` - Show help
+## Requirements
 
-## Permissions
+macOS 26 (Tahoe). Other versions are untested. Accessibility permissions required.
 
-This application requires Accessibility permissions. Grant access in:
-**System Settings > Privacy & Security > Accessibility**
+## Command Line
+
+NotifyMeHow also works from the terminal. Run `NotifyMeHow --help` for options, or just launch the app bundle to use the menu bar interface.
 
 ## License
 
