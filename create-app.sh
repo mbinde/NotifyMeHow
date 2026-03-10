@@ -29,7 +29,7 @@ cat > "${APP_DIR}/Contents/Info.plist" << 'EOF'
     <key>CFBundleDisplayName</key>
     <string>NotifyMeHow</string>
     <key>CFBundleIdentifier</key>
-    <string>com.local.notifymehow</string>
+    <string>com.motleywoods.NotifyMeHow</string>
     <key>CFBundleVersion</key>
     <string>1.0.0</string>
     <key>CFBundleShortVersionString</key>
