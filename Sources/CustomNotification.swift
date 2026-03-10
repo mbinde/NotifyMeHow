@@ -198,9 +198,11 @@ class CustomNotificationManager {
                 self?.startAnimation(for: window)
             }
 
-            // Auto-dismiss after dwell time
-            DispatchQueue.main.asyncAfter(deadline: .now() + self.config.dwellTime) { [weak self] in
-                self?.dismissNotification(window)
+            // Auto-dismiss after dwell time (0 = indefinite, no auto-dismiss)
+            if self.config.dwellTime > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + self.config.dwellTime) { [weak self] in
+                    self?.dismissNotification(window)
+                }
             }
         }
     }

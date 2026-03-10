@@ -23,7 +23,8 @@ class StyleControlsView: NSView {
     private var scaleLabel: NSTextField!
     private var opacitySlider: NSSlider!
     private var opacityLabel: NSTextField!
-    private var dwellField: NSTextField!
+    private var dwellSlider: NSSlider!
+    private var dwellLabel: NSTextField!
     private var bgColorWell: NSColorWell!
     private var appColorWell: NSColorWell!
     private var titleColorWell: NSColorWell!
@@ -135,18 +136,22 @@ class StyleControlsView: NSView {
         opacityLabel.frame = NSRect(x: padding + 240, y: y, width: 40, height: 22)
         addSubview(opacityLabel)
 
-        // Display time
+        // Display time (1-30 seconds, or 31 = indefinite)
         y -= 28
-        let dwellLabel = createLabel("Display:")
-        dwellLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
+        let dwellTextLabel = createLabel("Display:")
+        dwellTextLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
+        addSubview(dwellTextLabel)
+
+        dwellSlider = NSSlider(frame: NSRect(x: padding + 55, y: y, width: 180, height: 22))
+        dwellSlider.minValue = 1
+        dwellSlider.maxValue = 31  // 31 = indefinite
+        dwellSlider.target = self
+        dwellSlider.action = #selector(dwellChanged)
+        addSubview(dwellSlider)
+
+        dwellLabel = createLabel("5s")
+        dwellLabel.frame = NSRect(x: padding + 240, y: y, width: 70, height: 22)
         addSubview(dwellLabel)
-
-        dwellField = NSTextField(frame: NSRect(x: padding + 55, y: y, width: 45, height: 22))
-        addSubview(dwellField)
-
-        let secLabel = createLabel("seconds")
-        secLabel.frame = NSRect(x: padding + 105, y: y, width: 55, height: 22)
-        addSubview(secLabel)
 
         // Colors
         y -= 35
@@ -312,7 +317,18 @@ class StyleControlsView: NSView {
         scaleLabel.stringValue = String(format: "%.1fx", style.scale)
         opacitySlider.doubleValue = style.opacity
         opacityLabel.stringValue = String(format: "%.0f%%", style.opacity * 100)
-        dwellField.stringValue = String(Int(style.dwellTime))
+
+        // Dwell time: 0 means indefinite (show as 31 on slider)
+        if style.dwellTime <= 0 {
+            dwellSlider.doubleValue = 31
+            dwellLabel.stringValue = "Indefinite"
+        } else if style.dwellTime > 30 {
+            dwellSlider.doubleValue = 31
+            dwellLabel.stringValue = "Indefinite"
+        } else {
+            dwellSlider.doubleValue = style.dwellTime
+            dwellLabel.stringValue = "\(Int(style.dwellTime))s"
+        }
 
         bgColorWell.color = colorFromHex(style.backgroundColorHex)
         appColorWell.color = colorFromHex(style.appColorHex)
@@ -354,7 +370,9 @@ class StyleControlsView: NSView {
         style.offsetY = Double(offsetYField.stringValue) ?? 20
         style.scale = scaleSlider.doubleValue
         style.opacity = opacitySlider.doubleValue
-        style.dwellTime = Double(dwellField.stringValue) ?? 5
+        // Dwell time: slider value 31 = indefinite (stored as 0)
+        let sliderValue = Int(dwellSlider.doubleValue)
+        style.dwellTime = sliderValue >= 31 ? 0 : Double(sliderValue)
         style.backgroundColorHex = hexFromColor(bgColorWell.color)
         style.appColorHex = hexFromColor(appColorWell.color)
         style.titleColorHex = hexFromColor(titleColorWell.color)
@@ -396,6 +414,15 @@ class StyleControlsView: NSView {
 
     @objc private func opacityChanged() {
         opacityLabel.stringValue = String(format: "%.0f%%", opacitySlider.doubleValue * 100)
+    }
+
+    @objc private func dwellChanged() {
+        let value = Int(dwellSlider.doubleValue)
+        if value >= 31 {
+            dwellLabel.stringValue = "Indefinite"
+        } else {
+            dwellLabel.stringValue = "\(value)s"
+        }
     }
 
     @objc private func borderWidthChanged() {
