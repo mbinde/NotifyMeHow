@@ -10,7 +10,7 @@ class PreferencesWindowController: NSWindowController {
 
     private init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 360),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -20,33 +20,33 @@ class PreferencesWindowController: NSWindowController {
 
         super.init(window: window)
 
-        // Create tab view
-        let tabView = NSTabView(frame: NSRect(x: 0, y: 0, width: 480, height: 320))
+        // Create tab view with inset to avoid clipping
+        let inset: CGFloat = 10
+        let tabView = NSTabView(frame: NSRect(x: inset, y: inset, width: 480 - inset * 2, height: 360 - inset * 2))
         tabView.autoresizingMask = [.width, .height]
-        window.initialFirstResponder = tabView
 
         // General tab
         let generalItem = NSTabViewItem(identifier: "general")
         generalItem.label = "General"
-        generalTab = GeneralPreferencesView(frame: NSRect(x: 0, y: 0, width: 460, height: 270))
+        generalTab = GeneralPreferencesView(frame: NSRect(x: 0, y: 0, width: 440, height: 290))
         generalItem.view = generalTab
         tabView.addTabViewItem(generalItem)
 
         // Rules tab
         let rulesItem = NSTabViewItem(identifier: "rules")
         rulesItem.label = "Rules"
-        rulesTab = RulesPreferencesView(frame: NSRect(x: 0, y: 0, width: 460, height: 270))
+        rulesTab = RulesPreferencesView(frame: NSRect(x: 0, y: 0, width: 440, height: 290))
         rulesItem.view = rulesTab
         tabView.addTabViewItem(rulesItem)
 
         // Styles tab
         let stylesItem = NSTabViewItem(identifier: "styles")
         stylesItem.label = "Styles"
-        stylesTab = StylesPreferencesView(frame: NSRect(x: 0, y: 0, width: 460, height: 270))
+        stylesTab = StylesPreferencesView(frame: NSRect(x: 0, y: 0, width: 440, height: 290))
         stylesItem.view = stylesTab
         tabView.addTabViewItem(stylesItem)
 
-        window.contentView = tabView
+        window.contentView?.addSubview(tabView)
     }
 
     required init?(coder: NSCoder) {

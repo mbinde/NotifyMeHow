@@ -3,38 +3,66 @@ import Cocoa
 /// Criteria for matching a notification
 struct NotificationMatchCriteria: Codable {
     var appName: String = ""          // Empty = match any app
-    var titleContains: String = ""    // Empty = match any title
-    var bodyContains: String = ""     // Empty = match any body
+    var keywords: String = ""         // Comma-separated keywords to search in title/subtitle/body
+    var matchAll: Bool = false        // true = all keywords must match, false = any keyword matches
 
-    /// Check if all non-empty criteria match the notification content
+    // Legacy fields for migration (kept for decoding old data)
+    var titleContains: String = ""
+    var bodyContains: String = ""
+
+    /// Check if criteria match the notification content
     func matches(_ content: NotificationContent) -> Bool {
-        // All non-empty criteria must match (AND logic)
+        // App name must match if specified
         if !appName.isEmpty {
             if !content.appName.localizedCaseInsensitiveContains(appName) {
                 return false
             }
         }
 
+        // Parse keywords (comma-separated, trimmed)
+        let keywordList = keywords.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        // Also check legacy fields for migration
+        var allKeywords = keywordList
         if !titleContains.isEmpty {
-            if !content.title.localizedCaseInsensitiveContains(titleContains) {
-                return false
-            }
+            allKeywords.append(titleContains)
         }
-
         if !bodyContains.isEmpty {
-            // Check both subtitle and body
-            let fullBody = content.subtitle + " " + content.body
-            if !fullBody.localizedCaseInsensitiveContains(bodyContains) {
-                return false
-            }
+            allKeywords.append(bodyContains)
         }
 
-        return true
+        // If no keywords, match everything
+        if allKeywords.isEmpty {
+            return true
+        }
+
+        // Combine all text to search
+        let searchText = "\(content.title) \(content.subtitle) \(content.body)"
+
+        if matchAll {
+            // All keywords must match
+            for keyword in allKeywords {
+                if !searchText.localizedCaseInsensitiveContains(keyword) {
+                    return false
+                }
+            }
+            return true
+        } else {
+            // Any keyword matches
+            for keyword in allKeywords {
+                if searchText.localizedCaseInsensitiveContains(keyword) {
+                    return true
+                }
+            }
+            return false
+        }
     }
 
     /// Returns true if all criteria are empty (matches everything)
     var isEmpty: Bool {
-        return appName.isEmpty && titleContains.isEmpty && bodyContains.isEmpty
+        return appName.isEmpty && keywords.isEmpty && titleContains.isEmpty && bodyContains.isEmpty
     }
 
     /// Auto-generate a descriptive name from criteria
@@ -45,22 +73,26 @@ struct NotificationMatchCriteria: Codable {
             parts.append(appName)
         }
 
-        if !titleContains.isEmpty {
-            parts.append(titleContains)
-        }
-
-        if !bodyContains.isEmpty {
-            parts.append(bodyContains)
+        // Use keywords, or fall back to legacy fields
+        if !keywords.isEmpty {
+            parts.append(keywords)
+        } else {
+            if !titleContains.isEmpty {
+                parts.append(titleContains)
+            }
+            if !bodyContains.isEmpty {
+                parts.append(bodyContains)
+            }
         }
 
         if parts.isEmpty {
             return "All Notifications"
         }
 
-        // Format: "App: keyword1 keyword2" or just "keyword1 keyword2"
+        // Format: "App: keywords" or just "keywords"
         if !appName.isEmpty && parts.count > 1 {
-            let keywords = parts.dropFirst().joined(separator: " ")
-            return "\(appName): \(keywords)"
+            let keywordsPart = parts.dropFirst().joined(separator: " ")
+            return "\(appName): \(keywordsPart)"
         }
 
         return parts.joined(separator: " ")

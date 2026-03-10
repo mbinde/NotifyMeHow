@@ -253,8 +253,22 @@ class NotificationMonitor {
                     CustomNotificationManager.shared.configure(config)
                     CustomNotificationManager.shared.showNotification(content: content)
                     recentNotifications.append((content: contentHash, time: now))
+
+                    // Hide system notification if style requests it
+                    if style.hideSystemNotification {
+                        hideSystemNotification(window)
+                    }
                 }
             }
+        }
+    }
+
+    /// Move system notification off-screen to hide it
+    private func hideSystemNotification(_ window: AXUIElement) {
+        // Move window way off screen (negative coordinates)
+        var point = CGPoint(x: -5000, y: -5000)
+        if let value = AXValueCreate(.cgPoint, &point) {
+            AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, value)
         }
     }
 

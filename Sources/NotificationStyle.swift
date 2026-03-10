@@ -22,6 +22,7 @@ struct NotificationStyle: Codable, Identifiable {
     var borderColorHex: String = "FFFFFF"        // Border color
     var animation: String = "none"               // Animation type: none, pulse, jiggle, wiggle, bounce
     var animationLoops: Bool = false             // Whether animation repeats continuously
+    var hideSystemNotification: Bool = false     // Move system notification off-screen when showing custom
 
     /// Convert to CustomNotificationConfig
     func toConfig() -> CustomNotificationConfig {
@@ -54,6 +55,7 @@ struct NotificationStyle: Codable, Identifiable {
         config.borderColor = colorFromHex(borderColorHex)
         config.animation = animation
         config.animationLoops = animationLoops
+        config.hideSystemNotification = hideSystemNotification
 
         return config
     }

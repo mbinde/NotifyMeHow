@@ -26,18 +26,16 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
     private var dwellSlider: NSSlider!
     private var dwellLabel: NSTextField!
     private var bgColorWell: NSColorWell!
-    private var appColorWell: NSColorWell!
     private var titleColorWell: NSColorWell!
-    private var subtitleColorWell: NSColorWell!
-    private var bodyColorWell: NSColorWell!
+    private var bodyColorWell: NSColorWell!  // Used for both subtitle and body text
     private var iconImageView: NSImageView!
     private var bgImageView: NSImageView!
-    private var showAppNameCheckbox: NSButton!
     private var borderWidthSlider: NSSlider!
     private var borderWidthLabel: NSTextField!
     private var borderColorWell: NSColorWell!
     private var animationPopup: NSPopUpButton!
     private var animationLoopsCheckbox: NSButton!
+    private var hideSystemNotificationCheckbox: NSButton!
 
     // State
     private var customIconPath: String?
@@ -62,19 +60,42 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
 
     private func setupControls() {
         let padding: CGFloat = 20
-        var y = frame.height - 10
+        let contentWidth = frame.width - padding * 2
+        var y = frame.height - 5
 
-        // Position
+        // ═══════════════════════════════════════════════════════════════
+        // SECTION: Behavior
+        // ═══════════════════════════════════════════════════════════════
+        y -= 22
+        let behaviorHeader = createSectionHeader("Behavior")
+        behaviorHeader.frame = NSRect(x: padding, y: y, width: 100, height: 16)
+        addSubview(behaviorHeader)
+
+        y -= 24
+        hideSystemNotificationCheckbox = NSButton(checkboxWithTitle: "Hide system notification", target: self, action: #selector(hideSystemNotificationChanged))
+        hideSystemNotificationCheckbox.frame = NSRect(x: padding, y: y, width: 180, height: 20)
+        addSubview(hideSystemNotificationCheckbox)
+
+        let hideHelp = createHelpButton("When enabled, the macOS system notification will be hidden and only your custom notification will be shown.")
+        hideHelp.frame = NSRect(x: padding + 185, y: y + 3, width: 14, height: 14)
+        addSubview(hideHelp)
+
+        // ═══════════════════════════════════════════════════════════════
+        // SECTION: Position & Size
+        // ═══════════════════════════════════════════════════════════════
+        y -= 20
+        y = addSeparator(at: y, width: contentWidth, padding: padding)
+
+        let positionHeader = createSectionHeader("Position & Size")
+        positionHeader.frame = NSRect(x: padding, y: y, width: 120, height: 16)
+        addSubview(positionHeader)
+
         y -= 28
         let posLabel = createLabel("Position:")
-        posLabel.frame = NSRect(x: padding, y: y, width: 80, height: 22)
+        posLabel.frame = NSRect(x: padding, y: y + 2, width: 55, height: 20)
         addSubview(posLabel)
 
-        let posHelp = createHelpButton("Where the custom notification appears on screen. This is independent of where macOS places the system notification.")
-        posHelp.frame = NSRect(x: padding + 60, y: y + 4, width: 14, height: 14)
-        addSubview(posHelp)
-
-        positionPopup = NSPopUpButton(frame: NSRect(x: padding + 85, y: y, width: 140, height: 26), pullsDown: false)
+        positionPopup = NSPopUpButton(frame: NSRect(x: padding + 60, y: y, width: 130, height: 24), pullsDown: false)
         positionPopup.addItems(withTitles: [
             "Top Left", "Top Center", "Top Right",
             "Middle Left", "Center", "Middle Right",
@@ -84,43 +105,28 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         positionPopup.action = #selector(positionChanged)
         addSubview(positionPopup)
 
-        // Offset
-        y -= 28
-        let offsetLabel = createLabel("Offset:")
-        offsetLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
-        addSubview(offsetLabel)
-
         let xLabel = createLabel("X:")
-        xLabel.frame = NSRect(x: padding + 55, y: y, width: 20, height: 22)
+        xLabel.frame = NSRect(x: padding + 200, y: y + 2, width: 15, height: 20)
         addSubview(xLabel)
 
-        offsetXField = NSTextField(frame: NSRect(x: padding + 75, y: y, width: 45, height: 22))
+        offsetXField = NSTextField(frame: NSRect(x: padding + 215, y: y, width: 40, height: 22))
         offsetXField.delegate = self
         addSubview(offsetXField)
 
         let yLabel = createLabel("Y:")
-        yLabel.frame = NSRect(x: padding + 130, y: y, width: 20, height: 22)
+        yLabel.frame = NSRect(x: padding + 265, y: y + 2, width: 15, height: 20)
         addSubview(yLabel)
 
-        offsetYField = NSTextField(frame: NSRect(x: padding + 150, y: y, width: 45, height: 22))
+        offsetYField = NSTextField(frame: NSRect(x: padding + 280, y: y, width: 40, height: 22))
         offsetYField.delegate = self
         addSubview(offsetYField)
 
-        let pxLabel = createLabel("px")
-        pxLabel.frame = NSRect(x: padding + 200, y: y, width: 20, height: 22)
-        addSubview(pxLabel)
-
-        // Scale
-        y -= 28
+        y -= 30
         let scaleTextLabel = createLabel("Scale:")
-        scaleTextLabel.frame = NSRect(x: padding, y: y, width: 38, height: 22)
+        scaleTextLabel.frame = NSRect(x: padding, y: y + 2, width: 55, height: 20)
         addSubview(scaleTextLabel)
 
-        let scaleHelp = createHelpButton("Make the notification larger or smaller. 1.0x is standard size, 2.0x is double size.")
-        scaleHelp.frame = NSRect(x: padding + 40, y: y + 4, width: 14, height: 14)
-        addSubview(scaleHelp)
-
-        scaleSlider = NSSlider(frame: NSRect(x: padding + 55, y: y, width: 180, height: 22))
+        scaleSlider = NSSlider(frame: NSRect(x: padding + 60, y: y, width: 200, height: 22))
         scaleSlider.minValue = 0.5
         scaleSlider.maxValue = 3.0
         scaleSlider.target = self
@@ -128,16 +134,25 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         addSubview(scaleSlider)
 
         scaleLabel = createLabel("1.5x")
-        scaleLabel.frame = NSRect(x: padding + 240, y: y, width: 40, height: 22)
+        scaleLabel.frame = NSRect(x: padding + 265, y: y + 2, width: 40, height: 20)
         addSubview(scaleLabel)
 
-        // Opacity
+        // ═══════════════════════════════════════════════════════════════
+        // SECTION: Appearance
+        // ═══════════════════════════════════════════════════════════════
+        y -= 20
+        y = addSeparator(at: y, width: contentWidth, padding: padding)
+
+        let appearanceHeader = createSectionHeader("Appearance")
+        appearanceHeader.frame = NSRect(x: padding, y: y, width: 100, height: 16)
+        addSubview(appearanceHeader)
+
         y -= 28
         let opacityTextLabel = createLabel("Opacity:")
-        opacityTextLabel.frame = NSRect(x: padding, y: y, width: 55, height: 22)
+        opacityTextLabel.frame = NSRect(x: padding, y: y + 2, width: 55, height: 20)
         addSubview(opacityTextLabel)
 
-        opacitySlider = NSSlider(frame: NSRect(x: padding + 55, y: y, width: 180, height: 22))
+        opacitySlider = NSSlider(frame: NSRect(x: padding + 60, y: y, width: 140, height: 22))
         opacitySlider.minValue = 0.1
         opacitySlider.maxValue = 1.0
         opacitySlider.target = self
@@ -145,87 +160,74 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         addSubview(opacitySlider)
 
         opacityLabel = createLabel("95%")
-        opacityLabel.frame = NSRect(x: padding + 240, y: y, width: 40, height: 22)
+        opacityLabel.frame = NSRect(x: padding + 205, y: y + 2, width: 35, height: 20)
         addSubview(opacityLabel)
 
-        // Display time (1-30 seconds, or 31 = indefinite)
-        y -= 28
-        let dwellTextLabel = createLabel("Display:")
-        dwellTextLabel.frame = NSRect(x: padding, y: y, width: 48, height: 22)
+        let dwellTextLabel = createLabel("Duration:")
+        dwellTextLabel.frame = NSRect(x: padding + 245, y: y + 2, width: 55, height: 20)
         addSubview(dwellTextLabel)
 
-        let dwellHelp = createHelpButton("How long the notification stays on screen before auto-dismissing. 'Indefinite' means it stays until you click the X button.")
-        dwellHelp.frame = NSRect(x: padding + 50, y: y + 4, width: 14, height: 14)
-        addSubview(dwellHelp)
+        dwellLabel = createLabel("5s")
+        dwellLabel.frame = NSRect(x: padding + 300, y: y + 2, width: 50, height: 20)
+        addSubview(dwellLabel)
 
-        dwellSlider = NSSlider(frame: NSRect(x: padding + 70, y: y, width: 165, height: 22))
+        y -= 28
+        dwellSlider = NSSlider(frame: NSRect(x: padding + 60, y: y, width: 140, height: 20))
         dwellSlider.minValue = 1
-        dwellSlider.maxValue = 31  // 31 = indefinite
+        dwellSlider.maxValue = 31
         dwellSlider.target = self
         dwellSlider.action = #selector(dwellChanged)
         addSubview(dwellSlider)
 
-        dwellLabel = createLabel("5s")
-        dwellLabel.frame = NSRect(x: padding + 240, y: y, width: 55, height: 22)
-        addSubview(dwellLabel)
+        let dwellHelp = createHelpButton("How long the notification stays visible. 'Indefinite' means it stays until dismissed.")
+        dwellHelp.frame = NSRect(x: padding + 205, y: y + 3, width: 14, height: 14)
+        addSubview(dwellHelp)
 
-        // Colors
-        y -= 35
+        y -= 30
         let colorsLabel = createLabel("Colors:")
-        colorsLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
+        colorsLabel.frame = NSRect(x: padding, y: y + 2, width: 50, height: 20)
         addSubview(colorsLabel)
 
-        let bgLabel = createLabel("BG")
-        bgLabel.frame = NSRect(x: padding + 55, y: y, width: 22, height: 22)
+        let bgLabel = createLabel("Background")
+        bgLabel.frame = NSRect(x: padding + 55, y: y + 2, width: 70, height: 20)
         addSubview(bgLabel)
 
-        bgColorWell = NSColorWell(frame: NSRect(x: padding + 77, y: y, width: 32, height: 22))
+        bgColorWell = NSColorWell(frame: NSRect(x: padding + 130, y: y, width: 28, height: 22))
         addSubview(bgColorWell)
 
         let titleCLabel = createLabel("Title")
-        titleCLabel.frame = NSRect(x: padding + 120, y: y, width: 30, height: 22)
+        titleCLabel.frame = NSRect(x: padding + 170, y: y + 2, width: 30, height: 20)
         addSubview(titleCLabel)
 
-        titleColorWell = NSColorWell(frame: NSRect(x: padding + 152, y: y, width: 32, height: 22))
+        titleColorWell = NSColorWell(frame: NSRect(x: padding + 202, y: y, width: 28, height: 22))
         addSubview(titleColorWell)
 
-        let subtitleCLabel = createLabel("Subtitle")
-        subtitleCLabel.frame = NSRect(x: padding + 195, y: y, width: 45, height: 22)
-        addSubview(subtitleCLabel)
+        let textCLabel = createLabel("Text")
+        textCLabel.frame = NSRect(x: padding + 242, y: y + 2, width: 30, height: 20)
+        addSubview(textCLabel)
 
-        subtitleColorWell = NSColorWell(frame: NSRect(x: padding + 242, y: y, width: 32, height: 22))
-        addSubview(subtitleColorWell)
-
-        let bodyCLabel = createLabel("Body")
-        bodyCLabel.frame = NSRect(x: padding + 285, y: y, width: 32, height: 22)
-        addSubview(bodyCLabel)
-
-        bodyColorWell = NSColorWell(frame: NSRect(x: padding + 319, y: y, width: 32, height: 22))
+        bodyColorWell = NSColorWell(frame: NSRect(x: padding + 274, y: y, width: 28, height: 22))
         addSubview(bodyColorWell)
 
-        // App name row: checkbox + color
-        y -= 35
-        showAppNameCheckbox = NSButton(checkboxWithTitle: "Show app name", target: nil, action: nil)
-        showAppNameCheckbox.frame = NSRect(x: padding, y: y, width: 130, height: 20)
-        addSubview(showAppNameCheckbox)
+        // ═══════════════════════════════════════════════════════════════
+        // SECTION: Media
+        // ═══════════════════════════════════════════════════════════════
+        y -= 20
+        y = addSeparator(at: y, width: contentWidth, padding: padding)
 
-        let appCLabel = createLabel("App Color:")
-        appCLabel.frame = NSRect(x: padding + 140, y: y, width: 65, height: 22)
-        addSubview(appCLabel)
+        let mediaHeader = createSectionHeader("Media")
+        mediaHeader.frame = NSRect(x: padding, y: y, width: 60, height: 16)
+        addSubview(mediaHeader)
 
-        appColorWell = NSColorWell(frame: NSRect(x: padding + 205, y: y, width: 32, height: 22))
-        addSubview(appColorWell)
-
-        // Custom Icon
-        y -= 45
-        let iconLabel = createLabel("Custom Icon:")
-        iconLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
+        y -= 30
+        let iconLabel = createLabel("Icon:")
+        iconLabel.frame = NSRect(x: padding, y: y, width: 35, height: 20)
         addSubview(iconLabel)
 
-        iconImageView = NSImageView(frame: NSRect(x: padding + 90, y: y - 10, width: 40, height: 40))
+        iconImageView = NSImageView(frame: NSRect(x: padding + 40, y: y - 6, width: 32, height: 32))
         iconImageView.imageScaling = .scaleProportionallyUpOrDown
         iconImageView.wantsLayer = true
-        iconImageView.layer?.cornerRadius = 20
+        iconImageView.layer?.cornerRadius = 16
         iconImageView.layer?.masksToBounds = true
         iconImageView.layer?.borderWidth = 1
         iconImageView.layer?.borderColor = NSColor.separatorColor.cgColor
@@ -233,27 +235,22 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
 
         let chooseButton = NSButton(title: "Choose...", target: self, action: #selector(chooseIcon))
         chooseButton.bezelStyle = .rounded
-        chooseButton.frame = NSRect(x: padding + 140, y: y - 2, width: 80, height: 24)
+        chooseButton.controlSize = .small
+        chooseButton.frame = NSRect(x: padding + 80, y: y - 2, width: 65, height: 22)
         addSubview(chooseButton)
 
         let clearButton = NSButton(title: "Clear", target: self, action: #selector(clearIcon))
         clearButton.bezelStyle = .rounded
-        clearButton.frame = NSRect(x: padding + 225, y: y - 2, width: 60, height: 24)
+        clearButton.controlSize = .small
+        clearButton.frame = NSRect(x: padding + 148, y: y - 2, width: 45, height: 22)
         addSubview(clearButton)
 
-        let iconHint = createLabel("Square recommended (e.g. 128x128)")
-        iconHint.font = NSFont.systemFont(ofSize: 10)
-        iconHint.textColor = .secondaryLabelColor
-        iconHint.frame = NSRect(x: padding + 90, y: y - 30, width: 200, height: 14)
-        addSubview(iconHint)
-
-        // Background Image
-        y -= 60
+        // Background on same row
         let bgImageLabel = createLabel("Background:")
-        bgImageLabel.frame = NSRect(x: padding, y: y, width: 85, height: 22)
+        bgImageLabel.frame = NSRect(x: padding + 205, y: y, width: 75, height: 20)
         addSubview(bgImageLabel)
 
-        bgImageView = NSImageView(frame: NSRect(x: padding + 90, y: y - 10, width: 60, height: 40))
+        bgImageView = NSImageView(frame: NSRect(x: padding + 280, y: y - 6, width: 48, height: 32))
         bgImageView.imageScaling = .scaleProportionallyUpOrDown
         bgImageView.wantsLayer = true
         bgImageView.layer?.cornerRadius = 4
@@ -262,67 +259,80 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         bgImageView.layer?.borderColor = NSColor.separatorColor.cgColor
         addSubview(bgImageView)
 
+        y -= 26
         let chooseBgButton = NSButton(title: "Choose...", target: self, action: #selector(chooseBackgroundImage))
         chooseBgButton.bezelStyle = .rounded
-        chooseBgButton.frame = NSRect(x: padding + 160, y: y - 2, width: 80, height: 24)
+        chooseBgButton.controlSize = .small
+        chooseBgButton.frame = NSRect(x: padding + 205, y: y, width: 65, height: 22)
         addSubview(chooseBgButton)
 
         let clearBgButton = NSButton(title: "Clear", target: self, action: #selector(clearBackgroundImage))
         clearBgButton.bezelStyle = .rounded
-        clearBgButton.frame = NSRect(x: padding + 245, y: y - 2, width: 60, height: 24)
+        clearBgButton.controlSize = .small
+        clearBgButton.frame = NSRect(x: padding + 273, y: y, width: 45, height: 22)
         addSubview(clearBgButton)
 
-        let bgHint = createLabel("16:9 or wider recommended")
-        bgHint.font = NSFont.systemFont(ofSize: 10)
-        bgHint.textColor = .secondaryLabelColor
-        bgHint.frame = NSRect(x: padding + 90, y: y - 30, width: 200, height: 14)
-        addSubview(bgHint)
+        // ═══════════════════════════════════════════════════════════════
+        // SECTION: Effects
+        // ═══════════════════════════════════════════════════════════════
+        y -= 20
+        y = addSeparator(at: y, width: contentWidth, padding: padding)
 
-        // Border
-        y -= 50
+        let effectsHeader = createSectionHeader("Effects")
+        effectsHeader.frame = NSRect(x: padding, y: y, width: 60, height: 16)
+        addSubview(effectsHeader)
+
+        y -= 28
         let borderLabel = createLabel("Border:")
-        borderLabel.frame = NSRect(x: padding, y: y, width: 50, height: 22)
+        borderLabel.frame = NSRect(x: padding, y: y + 2, width: 45, height: 20)
         addSubview(borderLabel)
 
         borderWidthSlider = NSSlider(value: 0, minValue: 0, maxValue: 4, target: self, action: #selector(borderWidthChanged))
-        borderWidthSlider.frame = NSRect(x: padding + 55, y: y, width: 100, height: 22)
+        borderWidthSlider.frame = NSRect(x: padding + 50, y: y, width: 80, height: 22)
         borderWidthSlider.numberOfTickMarks = 5
         borderWidthSlider.allowsTickMarkValuesOnly = true
         addSubview(borderWidthSlider)
 
         borderWidthLabel = createLabel("0px")
-        borderWidthLabel.frame = NSRect(x: padding + 160, y: y, width: 35, height: 22)
+        borderWidthLabel.frame = NSRect(x: padding + 135, y: y + 2, width: 30, height: 20)
         addSubview(borderWidthLabel)
 
-        let borderColorLabel = createLabel("Color:")
-        borderColorLabel.frame = NSRect(x: padding + 200, y: y, width: 40, height: 22)
-        addSubview(borderColorLabel)
-
-        borderColorWell = NSColorWell(frame: NSRect(x: padding + 242, y: y, width: 32, height: 22))
+        borderColorWell = NSColorWell(frame: NSRect(x: padding + 165, y: y, width: 28, height: 22))
         borderColorWell.color = .white
         addSubview(borderColorWell)
 
-        // Animation
-        y -= 35
         let animationLabel = createLabel("Animation:")
-        animationLabel.frame = NSRect(x: padding, y: y, width: 62, height: 22)
+        animationLabel.frame = NSRect(x: padding + 210, y: y + 2, width: 65, height: 20)
         addSubview(animationLabel)
 
-        let animHelp = createHelpButton("Add eye-catching animation to the notification. 'Loop' repeats the animation continuously until dismissed.")
-        animHelp.frame = NSRect(x: padding + 64, y: y + 6, width: 14, height: 14)
-        addSubview(animHelp)
-
-        animationPopup = NSPopUpButton(frame: NSRect(x: padding + 85, y: y, width: 105, height: 26), pullsDown: false)
+        animationPopup = NSPopUpButton(frame: NSRect(x: padding + 275, y: y, width: 80, height: 24), pullsDown: false)
         animationPopup.addItems(withTitles: ["None", "Pulse", "Jiggle", "Wiggle", "Bounce"])
         animationPopup.selectItem(at: 0)
         addSubview(animationPopup)
 
-        animationLoopsCheckbox = NSButton(checkboxWithTitle: "Loop", target: nil, action: nil)
-        animationLoopsCheckbox.frame = NSRect(x: padding + 200, y: y + 3, width: 60, height: 20)
+        y -= 24
+        animationLoopsCheckbox = NSButton(checkboxWithTitle: "Loop animation continuously", target: nil, action: nil)
+        animationLoopsCheckbox.frame = NSRect(x: padding + 210, y: y, width: 170, height: 20)
         addSubview(animationLoopsCheckbox)
 
         // Load defaults
         loadStyleIntoControls(NotificationStyle())
+    }
+
+    // MARK: - Section Helpers
+
+    private func createSectionHeader(_ text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+        label.textColor = .secondaryLabelColor
+        return label
+    }
+
+    private func addSeparator(at y: CGFloat, width: CGFloat, padding: CGFloat) -> CGFloat {
+        let separator = NSBox(frame: NSRect(x: padding, y: y, width: width, height: 1))
+        separator.boxType = .separator
+        addSubview(separator)
+        return y - 24  // Space after separator before section header
     }
 
     // MARK: - Style Loading/Building
@@ -351,9 +361,7 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         }
 
         bgColorWell.color = colorFromHex(style.backgroundColorHex)
-        appColorWell.color = colorFromHex(style.appColorHex)
         titleColorWell.color = colorFromHex(style.titleColorHex)
-        subtitleColorWell.color = colorFromHex(style.subtitleColorHex)
         bodyColorWell.color = colorFromHex(style.bodyColorHex)
 
         // Load custom icon
@@ -372,14 +380,13 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
             bgImageView.image = nil
         }
 
-        showAppNameCheckbox.state = style.showAppName ? .on : .off
-
         borderWidthSlider.doubleValue = style.borderWidth
         borderWidthLabel.stringValue = "\(Int(style.borderWidth))px"
         borderColorWell.color = colorFromHex(style.borderColorHex)
 
         animationPopup.selectItem(at: animationToIndex(style.animation))
         animationLoopsCheckbox.state = style.animationLoops ? .on : .off
+        hideSystemNotificationCheckbox.state = style.hideSystemNotification ? .on : .off
 
         // Validate offsets after loading
         validateOffsets()
@@ -397,17 +404,19 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         let sliderValue = Int(dwellSlider.doubleValue)
         style.dwellTime = sliderValue >= 31 ? 0 : Double(sliderValue)
         style.backgroundColorHex = hexFromColor(bgColorWell.color)
-        style.appColorHex = hexFromColor(appColorWell.color)
         style.titleColorHex = hexFromColor(titleColorWell.color)
-        style.subtitleColorHex = hexFromColor(subtitleColorWell.color)
-        style.bodyColorHex = hexFromColor(bodyColorWell.color)
+        // Use body color for both subtitle and body text
+        let textColorHex = hexFromColor(bodyColorWell.color)
+        style.subtitleColorHex = textColorHex
+        style.bodyColorHex = textColorHex
         style.customIconPath = customIconPath
         style.backgroundImagePath = backgroundImagePath
-        style.showAppName = showAppNameCheckbox.state == .on
+        style.showAppName = false  // No longer exposed in UI
         style.borderWidth = borderWidthSlider.doubleValue
         style.borderColorHex = hexFromColor(borderColorWell.color)
         style.animation = indexToAnimation(animationPopup.indexOfSelectedItem)
         style.animationLoops = animationLoopsCheckbox.state == .on
+        style.hideSystemNotification = hideSystemNotificationCheckbox.state == .on
         return style
     }
 
@@ -456,6 +465,10 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
     @objc private func borderWidthChanged() {
         let width = Int(borderWidthSlider.doubleValue)
         borderWidthLabel.stringValue = "\(width)px"
+    }
+
+    @objc private func hideSystemNotificationChanged() {
+        // No-op, value will be read when building style
     }
 
     @objc private func chooseIcon() {
@@ -562,7 +575,7 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         let viewController = NSViewController()
         viewController.view = contentView
         popover.contentViewController = viewController
-        popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .maxY)
+        popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
     }
 
     private func cornerToIndex(_ corner: String) -> Int {

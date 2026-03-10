@@ -111,15 +111,6 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
 
         statusMenu.addItem(NSMenuItem.separator())
 
-        // Start/Stop
-        let toggleTitle = monitor == nil ? "Start Monitoring" : "Stop Monitoring"
-        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleMonitoring(_:)), keyEquivalent: "")
-        toggleItem.target = self
-        toggleItem.tag = 101
-        statusMenu.addItem(toggleItem)
-
-        statusMenu.addItem(NSMenuItem.separator())
-
         // Custom notification styles
         let prefsItem = NSMenuItem(title: "Custom Notification Styles...", action: #selector(showPreferences(_:)), keyEquivalent: ",")
         prefsItem.target = self
@@ -135,6 +126,13 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
         }
 
         statusMenu.addItem(NSMenuItem.separator())
+
+        // Start/Stop
+        let toggleTitle = monitor == nil ? "Start Monitoring" : "Stop Monitoring"
+        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleMonitoring(_:)), keyEquivalent: "")
+        toggleItem.target = self
+        toggleItem.tag = 101
+        statusMenu.addItem(toggleItem)
 
         // Quit
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp(_:)), keyEquivalent: "q")

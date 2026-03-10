@@ -288,11 +288,9 @@ extension RulesPreferencesView: NSTableViewDelegate {
         if !criteria.appName.isEmpty {
             parts.append("App: \(criteria.appName)")
         }
-        if !criteria.titleContains.isEmpty {
-            parts.append("Title: \(criteria.titleContains)")
-        }
-        if !criteria.bodyContains.isEmpty {
-            parts.append("Body: \(criteria.bodyContains)")
+        if !criteria.keywords.isEmpty {
+            let matchType = criteria.matchAll ? "all" : "any"
+            parts.append("Keywords (\(matchType)): \(criteria.keywords)")
         }
 
         if parts.isEmpty {
@@ -313,27 +311,23 @@ class RuleEditorWindowController: NSWindowController {
 
     // Criteria
     private var appNameField: NSTextField!
-    private var titleContainsField: NSTextField!
-    private var bodyContainsField: NSTextField!
+    private var keywordsField: NSTextField!
+    private var matchAnyRadio: NSButton!
+    private var matchAllRadio: NSButton!
 
     // Style selection
     private var stylePopup: NSPopUpButton!
-    private var customStyleContainer: NSView!
-    private var styleControlsView: StyleControlsView!
-    private var previewButton: NSButton!
+    private var editStyleButton: NSButton!
 
-    // Track if we're editing a custom style
-    private var isCustomStyle = false
-    private var editingStyle: NotificationStyle?
-    private var isNewRule: Bool
+    // Keep reference to style editor
+    private var styleEditor: StyleEditorWindowController?
 
     init(rule: NotificationRule, isNew: Bool, onSave: @escaping (NotificationRule) -> Void) {
         self.rule = rule
-        self.isNewRule = isNew
         self.onSave = onSave
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 720),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 320),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -363,13 +357,13 @@ class RuleEditorWindowController: NSWindowController {
         nameLabel.frame = NSRect(x: padding, y: y, width: 100, height: 22)
         contentView.addSubview(nameLabel)
 
-        nameField = NSTextField(frame: NSRect(x: padding + 100, y: y, width: 280, height: 22))
-        nameField.placeholderString = "(auto-generated from criteria)"
+        nameField = createTextField(placeholder: "(auto-generated from criteria)")
+        nameField.frame = NSRect(x: padding + 100, y: y, width: 280, height: 24)
         contentView.addSubview(nameField)
 
         // Match Criteria Section
         y -= 35
-        let criteriaHeader = createLabel("Match Criteria (all must match)", bold: true)
+        let criteriaHeader = createLabel("Match Criteria", bold: true)
         criteriaHeader.frame = NSRect(x: padding, y: y, width: 300, height: 20)
         contentView.addSubview(criteriaHeader)
 
@@ -378,27 +372,38 @@ class RuleEditorWindowController: NSWindowController {
         appLabel.frame = NSRect(x: padding, y: y, width: 130, height: 22)
         contentView.addSubview(appLabel)
 
-        appNameField = NSTextField(frame: NSRect(x: padding + 135, y: y, width: 245, height: 22))
-        appNameField.placeholderString = "e.g., Messages, Slack"
+        appNameField = createTextField(placeholder: "e.g., Messages, Slack")
+        appNameField.frame = NSRect(x: padding + 135, y: y, width: 245, height: 24)
         contentView.addSubview(appNameField)
 
         y -= 28
-        let titleLabel = createLabel("Title contains:")
-        titleLabel.frame = NSRect(x: padding, y: y, width: 130, height: 22)
-        contentView.addSubview(titleLabel)
+        let keywordsLabel = createLabel("Keywords:")
+        keywordsLabel.frame = NSRect(x: padding, y: y, width: 130, height: 22)
+        contentView.addSubview(keywordsLabel)
 
-        titleContainsField = NSTextField(frame: NSRect(x: padding + 135, y: y, width: 245, height: 22))
-        titleContainsField.placeholderString = "e.g., John Smith"
-        contentView.addSubview(titleContainsField)
+        keywordsField = createTextField(placeholder: "e.g., urgent, meeting, John")
+        keywordsField.frame = NSRect(x: padding + 135, y: y, width: 245, height: 24)
+        contentView.addSubview(keywordsField)
 
-        y -= 28
-        let bodyLabel = createLabel("Body contains:")
-        bodyLabel.frame = NSRect(x: padding, y: y, width: 130, height: 22)
-        contentView.addSubview(bodyLabel)
+        y -= 22
+        let keywordsHint = createLabel("Comma-separated. Searches title, subtitle, and body.")
+        keywordsHint.font = NSFont.systemFont(ofSize: 10)
+        keywordsHint.textColor = .secondaryLabelColor
+        keywordsHint.frame = NSRect(x: padding + 135, y: y, width: 245, height: 16)
+        contentView.addSubview(keywordsHint)
 
-        bodyContainsField = NSTextField(frame: NSRect(x: padding + 135, y: y, width: 245, height: 22))
-        bodyContainsField.placeholderString = "e.g., meeting, urgent"
-        contentView.addSubview(bodyContainsField)
+        y -= 24
+        let matchLabel = createLabel("Match:")
+        matchLabel.frame = NSRect(x: padding, y: y, width: 130, height: 22)
+        contentView.addSubview(matchLabel)
+
+        matchAnyRadio = NSButton(radioButtonWithTitle: "Any keyword", target: nil, action: nil)
+        matchAnyRadio.frame = NSRect(x: padding + 135, y: y, width: 100, height: 22)
+        contentView.addSubview(matchAnyRadio)
+
+        matchAllRadio = NSButton(radioButtonWithTitle: "All keywords", target: nil, action: nil)
+        matchAllRadio.frame = NSRect(x: padding + 245, y: y, width: 110, height: 22)
+        contentView.addSubview(matchAllRadio)
 
         // Style Selection Section
         y -= 35
@@ -416,23 +421,12 @@ class RuleEditorWindowController: NSWindowController {
         stylePopup.action = #selector(styleSelectionChanged)
         contentView.addSubview(stylePopup)
 
-        // Custom style container with StyleControlsView
-        y -= 10
-        customStyleContainer = NSView(frame: NSRect(x: 0, y: 60, width: contentView.frame.width, height: y - 60))
-        contentView.addSubview(customStyleContainer)
+        editStyleButton = NSButton(title: "Edit...", target: self, action: #selector(editSelectedStyle))
+        editStyleButton.bezelStyle = .rounded
+        editStyleButton.frame = NSRect(x: padding + 265, y: y, width: 60, height: 26)
+        contentView.addSubview(editStyleButton)
 
-        styleControlsView = StyleControlsView(frame: NSRect(x: 0, y: 0, width: customStyleContainer.frame.width, height: customStyleContainer.frame.height))
-        styleControlsView.parentWindow = window
-        customStyleContainer.addSubview(styleControlsView)
-
-        // Buttons (always at bottom)
-        previewButton = NSButton(title: "Preview", target: self, action: #selector(preview))
-        previewButton.bezelStyle = .rounded
-        previewButton.frame = NSRect(x: padding, y: 20, width: 80, height: 28)
-        contentView.addSubview(previewButton)
-
-        updateCustomStyleVisibility()
-
+        // Buttons at bottom
         let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancel))
         cancelButton.bezelStyle = .rounded
         cancelButton.frame = NSRect(x: contentView.frame.width - padding - 170, y: 20, width: 80, height: 28)
@@ -456,7 +450,20 @@ class RuleEditorWindowController: NSWindowController {
         return label
     }
 
-    private func rebuildStylePopup() {
+    private func createTextField(placeholder: String) -> NSTextField {
+        let field = NSTextField()
+        field.placeholderString = placeholder
+        field.drawsBackground = true
+        field.isBordered = true
+        field.wantsLayer = true
+        field.layer?.borderWidth = 1
+        field.layer?.borderColor = NSColor.separatorColor.cgColor
+        field.layer?.cornerRadius = 5
+        field.backgroundColor = NSColor.controlBackgroundColor
+        return field
+    }
+
+    private func rebuildStylePopup(selectingStyleId: UUID? = nil) {
         stylePopup.removeAllItems()
 
         // First option: No custom notification
@@ -470,98 +477,107 @@ class RuleEditorWindowController: NSWindowController {
             stylePopup.addItem(withTitle: style.name)
         }
 
-        // Add separator and custom option
+        // Add separator and create new option
         stylePopup.menu?.addItem(NSMenuItem.separator())
-        stylePopup.addItem(withTitle: "Custom...")
+        stylePopup.addItem(withTitle: "Create New Style...")
+
+        // Select the appropriate item
+        if let styleId = selectingStyleId,
+           let index = StylesManager.shared.styles.firstIndex(where: { $0.id == styleId }) {
+            stylePopup.selectItem(at: index + 2)  // +2 for "No custom" and separator
+        }
+
+        updateEditButtonState()
     }
 
     private func loadRule() {
         nameField.stringValue = rule.name
 
         appNameField.stringValue = rule.criteria.appName
-        titleContainsField.stringValue = rule.criteria.titleContains
-        bodyContainsField.stringValue = rule.criteria.bodyContains
 
-        rebuildStylePopup()
-
-        // Select the appropriate style in the popup
-        if let styleId = rule.styleId, let style = StylesManager.shared.style(withId: styleId) {
-            // Find the style in the popup (offset by 2 for "No custom" + separator)
-            if let index = StylesManager.shared.styles.firstIndex(where: { $0.id == styleId }) {
-                stylePopup.selectItem(at: index + 2)  // +2 for "No custom" and separator
-            }
-            editingStyle = style
-            styleControlsView.style = style
-            isCustomStyle = true
+        // Load keywords - prefer new field, fall back to legacy fields
+        if !rule.criteria.keywords.isEmpty {
+            keywordsField.stringValue = rule.criteria.keywords
         } else {
-            // No style - select "No custom notification"
-            stylePopup.selectItem(at: 0)
-            isCustomStyle = false
+            // Migrate from legacy fields
+            var legacyKeywords: [String] = []
+            if !rule.criteria.titleContains.isEmpty {
+                legacyKeywords.append(rule.criteria.titleContains)
+            }
+            if !rule.criteria.bodyContains.isEmpty {
+                legacyKeywords.append(rule.criteria.bodyContains)
+            }
+            keywordsField.stringValue = legacyKeywords.joined(separator: ", ")
         }
 
-        updateCustomStyleVisibility()
+        // Set radio buttons
+        if rule.criteria.matchAll {
+            matchAllRadio.state = .on
+            matchAnyRadio.state = .off
+        } else {
+            matchAnyRadio.state = .on
+            matchAllRadio.state = .off
+        }
+
+        rebuildStylePopup(selectingStyleId: rule.styleId)
+
+        // If no style selected, select "No custom notification"
+        if rule.styleId == nil {
+            stylePopup.selectItem(at: 0)
+        }
+
+        updateEditButtonState()
     }
 
     @objc private func styleSelectionChanged() {
         let selectedIndex = stylePopup.indexOfSelectedItem
         let lastIndex = stylePopup.numberOfItems - 1
 
-        if selectedIndex == 0 {
-            // "No custom notification"
-            isCustomStyle = false
-            editingStyle = nil
-        } else if selectedIndex == lastIndex {
-            // "Custom..." - creating a brand new style
-            isCustomStyle = true
-            editingStyle = nil
-            styleControlsView.style = NotificationStyle()
-        } else {
-            // A saved style (accounting for separator) - allow editing
-            let styleIndex = selectedIndex - 2
-            if styleIndex >= 0 && styleIndex < StylesManager.shared.styles.count {
-                let style = StylesManager.shared.styles[styleIndex]
-                editingStyle = style
-                styleControlsView.style = style
-                isCustomStyle = true
+        if selectedIndex == lastIndex {
+            // "Create New Style..." - open style editor with new style
+            var newStyle = NotificationStyle()
+            newStyle.name = generateUniqueStyleName()
+
+            styleEditor = StyleEditorWindowController(style: newStyle) { [weak self] savedStyle in
+                StylesManager.shared.addStyle(savedStyle)
+                self?.rebuildStylePopup(selectingStyleId: savedStyle.id)
+                self?.styleEditor = nil
+            }
+            styleEditor?.showWindow()
+
+            // Reset popup to previous selection while editor is open
+            if let currentStyleId = rule.styleId,
+               let index = StylesManager.shared.styles.firstIndex(where: { $0.id == currentStyleId }) {
+                stylePopup.selectItem(at: index + 2)
+            } else {
+                stylePopup.selectItem(at: 0)
             }
         }
 
-        updateCustomStyleVisibility()
+        updateEditButtonState()
     }
 
-    private func updateCustomStyleVisibility() {
-        customStyleContainer.isHidden = !isCustomStyle
-        previewButton.isHidden = !isCustomStyle
+    private func updateEditButtonState() {
+        let selectedIndex = stylePopup.indexOfSelectedItem
+        let lastIndex = stylePopup.numberOfItems - 1
+        // Enable edit button only for saved styles (not "No custom" or "Create New...")
+        editStyleButton.isEnabled = selectedIndex > 0 && selectedIndex < lastIndex
     }
 
-    @objc private func preview() {
-        styleControlsView.showPreview()
-    }
+    @objc private func editSelectedStyle() {
+        let selectedIndex = stylePopup.indexOfSelectedItem
+        let styleIndex = selectedIndex - 2  // Account for "No custom" and separator
 
-    /// Check if the current style values differ from the original editingStyle
-    private func styleWasModified() -> Bool {
-        guard let original = editingStyle else { return true }  // New style = always "modified"
+        guard styleIndex >= 0 && styleIndex < StylesManager.shared.styles.count else { return }
 
-        let current = styleControlsView.style
-        if current.position != original.position { return true }
-        if current.offsetX != original.offsetX { return true }
-        if current.offsetY != original.offsetY { return true }
-        if current.scale != original.scale { return true }
-        if current.opacity != original.opacity { return true }
-        if current.dwellTime != original.dwellTime { return true }
-        if current.backgroundColorHex != original.backgroundColorHex { return true }
-        if current.appColorHex != original.appColorHex { return true }
-        if current.titleColorHex != original.titleColorHex { return true }
-        if current.subtitleColorHex != original.subtitleColorHex { return true }
-        if current.bodyColorHex != original.bodyColorHex { return true }
-        if current.customIconPath != original.customIconPath { return true }
-        if current.backgroundImagePath != original.backgroundImagePath { return true }
-        if current.showAppName != original.showAppName { return true }
-        if current.borderWidth != original.borderWidth { return true }
-        if current.borderColorHex != original.borderColorHex { return true }
-        if current.animation != original.animation { return true }
+        let style = StylesManager.shared.styles[styleIndex]
 
-        return false
+        styleEditor = StyleEditorWindowController(style: style) { [weak self] updatedStyle in
+            StylesManager.shared.updateStyle(updatedStyle)
+            self?.rebuildStylePopup(selectingStyleId: updatedStyle.id)
+            self?.styleEditor = nil
+        }
+        styleEditor?.showWindow()
     }
 
     @objc private func cancel() {
@@ -574,86 +590,45 @@ class RuleEditorWindowController: NSWindowController {
 
         // Save criteria
         rule.criteria.appName = appNameField.stringValue
-        rule.criteria.titleContains = titleContainsField.stringValue
-        rule.criteria.bodyContains = bodyContainsField.stringValue
+        rule.criteria.keywords = keywordsField.stringValue
+        rule.criteria.matchAll = matchAllRadio.state == .on
+        // Clear legacy fields when saving
+        rule.criteria.titleContains = ""
+        rule.criteria.bodyContains = ""
 
         let selectedIndex = stylePopup.indexOfSelectedItem
         let lastIndex = stylePopup.numberOfItems - 1
 
-        if selectedIndex == 0 {
-            // "No custom notification"
+        if selectedIndex == 0 || selectedIndex == lastIndex {
+            // "No custom notification" or "Create New..." (user didn't finish creating)
             rule.styleId = nil
-            finalizeSave()
-        } else if selectedIndex == lastIndex {
-            // "Custom..." - create a new style and save it
-            var newStyle = styleControlsView.style
-            newStyle.id = UUID()  // Ensure new ID
-            newStyle.name = generateUniqueStyleName()
-            StylesManager.shared.addStyle(newStyle)
-            rule.styleId = newStyle.id
-            finalizeSave()
         } else {
-            // A saved style - check if modified
+            // A saved style
             let styleIndex = selectedIndex - 2
-            guard styleIndex >= 0 && styleIndex < StylesManager.shared.styles.count else {
-                finalizeSave()
-                return
-            }
-
-            let originalStyle = StylesManager.shared.styles[styleIndex]
-            rule.styleId = originalStyle.id
-
-            // If style wasn't modified, just save the rule
-            if !styleWasModified() {
-                finalizeSave()
-                return
-            }
-
-            // Style was modified - check if it's used by other rules
-            let otherRulesCount = RulesManager.shared.countRulesUsing(styleId: originalStyle.id, excluding: rule.id)
-
-            if otherRulesCount == 0 {
-                // Only this rule uses it - just update the style
-                var updatedStyle = styleControlsView.style
-                updatedStyle.id = originalStyle.id
-                updatedStyle.name = originalStyle.name
-                StylesManager.shared.updateStyle(updatedStyle)
-                finalizeSave()
+            if styleIndex >= 0 && styleIndex < StylesManager.shared.styles.count {
+                rule.styleId = StylesManager.shared.styles[styleIndex].id
             } else {
-                // Other rules use this style - ask user what to do
-                let alert = NSAlert()
-                alert.messageText = "This style is shared"
-                alert.informativeText = "The style \"\(originalStyle.name)\" is used by \(otherRulesCount) other rule\(otherRulesCount == 1 ? "" : "s"). What would you like to do?"
-                alert.addButton(withTitle: "Update All")
-                alert.addButton(withTitle: "Save as New Style")
-                alert.addButton(withTitle: "Cancel")
-                alert.alertStyle = .warning
-
-                let response = alert.runModal()
-                if response == .alertFirstButtonReturn {
-                    // Update all - modify the shared style
-                    var updatedStyle = styleControlsView.style
-                    updatedStyle.id = originalStyle.id
-                    updatedStyle.name = originalStyle.name
-                    StylesManager.shared.updateStyle(updatedStyle)
-                    finalizeSave()
-                } else if response == .alertSecondButtonReturn {
-                    // Save as new style
-                    var newStyle = styleControlsView.style
-                    newStyle.id = UUID()
-                    newStyle.name = generateUniqueStyleName()
-                    StylesManager.shared.addStyle(newStyle)
-                    rule.styleId = newStyle.id
-                    finalizeSave()
-                }
-                // Cancel - do nothing, stay in editor
+                rule.styleId = nil
             }
         }
+
+        onSave(rule)
+        window?.orderOut(nil)
     }
 
     /// Generate a unique style name based on the rule's display name
     private func generateUniqueStyleName() -> String {
-        let baseName = "Style for \(rule.displayName)"
+        // Use rule criteria to generate name, or fall back to generic
+        var baseName: String
+        if !appNameField.stringValue.isEmpty {
+            baseName = "Style for \(appNameField.stringValue)"
+        } else if !keywordsField.stringValue.isEmpty {
+            let firstKeyword = keywordsField.stringValue.split(separator: ",").first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
+            baseName = "Style for \(firstKeyword)"
+        } else {
+            baseName = "New Style"
+        }
+
         let existingNames = Set(StylesManager.shared.styles.map { $0.name })
 
         // If base name doesn't exist, use it
@@ -670,11 +645,6 @@ class RuleEditorWindowController: NSWindowController {
             }
             counter += 1
         }
-    }
-
-    private func finalizeSave() {
-        onSave(rule)
-        window?.orderOut(nil)
     }
 
     func showWindow() {

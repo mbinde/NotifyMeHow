@@ -28,6 +28,7 @@ struct CustomNotificationConfig {
     var borderColor: NSColor = .white  // Border color
     var animation: String = "none"  // Animation type: none, pulse, jiggle, wiggle, bounce
     var animationLoops: Bool = false  // Whether animation repeats continuously
+    var hideSystemNotification: Bool = false  // Move system notification off-screen
 }
 
 /// Content extracted from a notification
