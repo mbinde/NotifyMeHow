@@ -70,7 +70,7 @@ class PreferencesWindowController: NSWindowController {
 
 // MARK: - General Preferences Tab
 
-class GeneralPreferencesView: NSView {
+class GeneralPreferencesView: NSView, NSTextFieldDelegate {
     private let settings = Settings.shared
 
     private var positionPopup: NSPopUpButton!
@@ -123,6 +123,7 @@ class GeneralPreferencesView: NSView {
 
         offsetXField = NSTextField(frame: NSRect(x: padding + 90, y: y, width: 50, height: 22))
         offsetXField.placeholderString = "20"
+        offsetXField.delegate = self
         offsetXField.target = self
         offsetXField.action = #selector(offsetChanged)
         addSubview(offsetXField)
@@ -133,6 +134,7 @@ class GeneralPreferencesView: NSView {
 
         offsetYField = NSTextField(frame: NSRect(x: padding + 170, y: y, width: 50, height: 22))
         offsetYField.placeholderString = "40"
+        offsetYField.delegate = self
         offsetYField.target = self
         offsetYField.action = #selector(offsetChanged)
         addSubview(offsetYField)
@@ -185,6 +187,7 @@ class GeneralPreferencesView: NSView {
         offsetXField.stringValue = String(Int(settings.positionOffsetX))
         offsetYField.stringValue = String(Int(settings.positionOffsetY))
         autoStartCheckbox.state = settings.autoStartMonitoring ? .on : .off
+        validateOffsets()
     }
 
     private func cornerToIndex(_ corner: NotificationPosition.Corner) -> Int {
@@ -218,6 +221,7 @@ class GeneralPreferencesView: NSView {
 
     @objc private func positionChanged() {
         settings.positionCorner = indexToCorner(positionPopup.indexOfSelectedItem)
+        validateOffsets()
     }
 
     @objc private func offsetChanged() {
@@ -227,6 +231,54 @@ class GeneralPreferencesView: NSView {
         if let y = Double(offsetYField.stringValue) {
             settings.positionOffsetY = CGFloat(y)
         }
+        validateOffsets()
+    }
+
+    // MARK: - NSTextFieldDelegate
+
+    func controlTextDidChange(_ obj: Notification) {
+        validateOffsets()
+    }
+
+    /// Check if current offsets would push notification off-screen and highlight fields in red if so
+    private func validateOffsets() {
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+
+        let offsetX = CGFloat(Double(offsetXField.stringValue) ?? 0)
+        let offsetY = CGFloat(Double(offsetYField.stringValue) ?? 0)
+
+        // Estimate notification size (standard macOS notification is roughly 360x90)
+        let estimatedWidth: CGFloat = 360
+        let estimatedHeight: CGFloat = 90
+
+        let corner = indexToCorner(positionPopup.indexOfSelectedItem)
+
+        // Calculate where the notification would be positioned
+        var wouldBeOffScreenX = false
+        var wouldBeOffScreenY = false
+
+        switch corner {
+        case .topRight, .middleRight, .bottomRight:
+            wouldBeOffScreenX = offsetX > screenFrame.width - estimatedWidth
+        case .topLeft, .middleLeft, .bottomLeft:
+            wouldBeOffScreenX = offsetX > screenFrame.width - estimatedWidth
+        case .topCenter, .center, .bottomCenter:
+            break  // Center positions ignore X offset
+        }
+
+        switch corner {
+        case .topLeft, .topCenter, .topRight:
+            wouldBeOffScreenY = offsetY > screenFrame.height - estimatedHeight
+        case .bottomLeft, .bottomCenter, .bottomRight:
+            wouldBeOffScreenY = offsetY > screenFrame.height - estimatedHeight
+        case .middleLeft, .center, .middleRight:
+            break  // Middle positions ignore Y offset
+        }
+
+        // Update field colors
+        offsetXField.textColor = wouldBeOffScreenX ? .systemRed : .labelColor
+        offsetYField.textColor = wouldBeOffScreenY ? .systemRed : .labelColor
     }
 
     @objc private func autoStartChanged() {
