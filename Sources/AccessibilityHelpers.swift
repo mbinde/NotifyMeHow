@@ -1,8 +1,14 @@
 import ApplicationServices
 import Cocoa
 
-/// Check if accessibility permissions are granted (without prompting)
+/// Check if accessibility permissions are granted (prompts user via system dialog if not)
 func checkAccessibilityPermissions() -> Bool {
+    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+    return AXIsProcessTrustedWithOptions(options)
+}
+
+/// Check if accessibility permissions are granted without prompting
+func hasAccessibilityPermissions() -> Bool {
     let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
     return AXIsProcessTrustedWithOptions(options)
 }

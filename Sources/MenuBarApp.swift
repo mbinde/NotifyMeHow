@@ -35,9 +35,8 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
         )
 
         // Check permissions and auto-start
-        if !checkAccessibilityPermissions() {
-            showAccessibilityAlert()
-        } else if settings.autoStartMonitoring {
+        // checkAccessibilityPermissions() will show system prompt if needed
+        if checkAccessibilityPermissions() && settings.autoStartMonitoring {
             startMonitoring()
             rebuildMenu()  // Update menu to show "Running" status
         }
@@ -165,8 +164,8 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
     }
 
     private func startMonitoring() {
+        // checkAccessibilityPermissions() will show system prompt if needed
         if !checkAccessibilityPermissions() {
-            showAccessibilityAlert()
             return
         }
 
@@ -205,19 +204,6 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
     @objc func quitApp(_ sender: NSMenuItem) {
         monitor?.stop()
         NSApplication.shared.terminate(nil)
-    }
-
-    private func showAccessibilityAlert() {
-        let alert = NSAlert()
-        alert.messageText = "Accessibility Permission Required"
-        alert.informativeText = "NotifyMeHow needs accessibility permissions to move notification windows.\n\nClick 'Open Settings' to grant permission."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Open Settings")
-        alert.addButton(withTitle: "Later")
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            openAccessibilitySettings(NSMenuItem())
-        }
     }
 }
 
