@@ -1,4 +1,5 @@
 import Cocoa
+import ServiceManagement
 
 /// Keys for UserDefaults storage
 private enum SettingsKey: String {
@@ -278,10 +279,25 @@ class Settings {
     }
 
     var launchAtLogin: Bool {
-        get { defaults.bool(forKey: SettingsKey.launchAtLogin.rawValue) }
+        get {
+            if #available(macOS 13.0, *) {
+                return SMAppService.mainApp.status == .enabled
+            }
+            return defaults.bool(forKey: SettingsKey.launchAtLogin.rawValue)
+        }
         set {
+            if #available(macOS 13.0, *) {
+                do {
+                    if newValue {
+                        try SMAppService.mainApp.register()
+                    } else {
+                        try SMAppService.mainApp.unregister()
+                    }
+                } catch {
+                    print("Failed to \(newValue ? "enable" : "disable") launch at login: \(error)")
+                }
+            }
             defaults.set(newValue, forKey: SettingsKey.launchAtLogin.rawValue)
-            // Note: Actually setting launch at login requires LaunchServices or SMLoginItemSetEnabled
             notifyChange()
         }
     }

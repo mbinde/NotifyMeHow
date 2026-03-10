@@ -37,6 +37,12 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
         // Prompt for permissions if needed (shows system dialog)
         _ = checkAccessibilityPermissions()
 
+        // Enable launch at login by default on first run
+        if !UserDefaults.standard.bool(forKey: "hasLaunchedBefore") {
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            settings.launchAtLogin = true
+        }
+
         // Always try to start monitoring if auto-start is enabled
         // It will just silently fail if permissions aren't granted yet
         if settings.autoStartMonitoring {

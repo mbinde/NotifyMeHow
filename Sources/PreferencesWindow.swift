@@ -77,6 +77,7 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
     private var offsetXField: NSTextField!
     private var offsetYField: NSTextField!
     private var autoStartCheckbox: NSButton!
+    private var launchAtLoginCheckbox: NSButton!
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -149,7 +150,12 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
         appHeader.frame = NSRect(x: padding, y: y, width: 200, height: 20)
         addSubview(appHeader)
 
-        y -= 30
+        y -= 26
+        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Launch at login", target: self, action: #selector(launchAtLoginChanged))
+        launchAtLoginCheckbox.frame = NSRect(x: padding, y: y, width: 350, height: 22)
+        addSubview(launchAtLoginCheckbox)
+
+        y -= 24
         autoStartCheckbox = NSButton(checkboxWithTitle: "Start monitoring automatically when app launches", target: self, action: #selector(autoStartChanged))
         autoStartCheckbox.frame = NSRect(x: padding, y: y, width: 350, height: 22)
         addSubview(autoStartCheckbox)
@@ -197,6 +203,7 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
         positionPopup.selectItem(at: cornerToIndex(settings.positionCorner))
         offsetXField.stringValue = String(Int(settings.positionOffsetX))
         offsetYField.stringValue = String(Int(settings.positionOffsetY))
+        launchAtLoginCheckbox.state = settings.launchAtLogin ? .on : .off
         autoStartCheckbox.state = settings.autoStartMonitoring ? .on : .off
         validateOffsets()
     }
@@ -294,6 +301,10 @@ class GeneralPreferencesView: NSView, NSTextFieldDelegate {
 
     @objc private func autoStartChanged() {
         settings.autoStartMonitoring = autoStartCheckbox.state == .on
+    }
+
+    @objc private func launchAtLoginChanged() {
+        settings.launchAtLogin = launchAtLoginCheckbox.state == .on
     }
 
     @objc private func exportSettings() {
