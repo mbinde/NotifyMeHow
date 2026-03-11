@@ -28,6 +28,9 @@ final class ExportImportTests: XCTestCase {
         style.animation = "pulse"
         style.animationLoops = true
         style.hideSystemNotification = true
+        style.hideIcon = true
+        style.hideTitle = false
+        style.hideText = true
 
         let encoder = JSONEncoder()
         let data = try encoder.encode(style)
@@ -54,6 +57,9 @@ final class ExportImportTests: XCTestCase {
         XCTAssertEqual(json["animation"] as? String, "pulse")
         XCTAssertEqual(json["animationLoops"] as? Bool, true)
         XCTAssertEqual(json["hideSystemNotification"] as? Bool, true)
+        XCTAssertEqual(json["hideIcon"] as? Bool, true)
+        XCTAssertEqual(json["hideTitle"] as? Bool, false)
+        XCTAssertEqual(json["hideText"] as? Bool, true)
     }
 
     func testNotificationStyleDecodesAllFields() throws {
@@ -79,7 +85,10 @@ final class ExportImportTests: XCTestCase {
             "borderColorHex": "FEDCBA",
             "animation": "wiggle",
             "animationLoops": true,
-            "hideSystemNotification": true
+            "hideSystemNotification": true,
+            "hideIcon": true,
+            "hideTitle": false,
+            "hideText": true
         }
         """
 
@@ -107,6 +116,9 @@ final class ExportImportTests: XCTestCase {
         XCTAssertEqual(style.animation, "wiggle")
         XCTAssertEqual(style.animationLoops, true)
         XCTAssertEqual(style.hideSystemNotification, true)
+        XCTAssertEqual(style.hideIcon, true)
+        XCTAssertEqual(style.hideTitle, false)
+        XCTAssertEqual(style.hideText, true)
     }
 
     func testNotificationStyleRoundTrip() throws {
@@ -131,6 +143,9 @@ final class ExportImportTests: XCTestCase {
         original.animation = "bounce"
         original.animationLoops = false
         original.hideSystemNotification = true
+        original.hideIcon = true
+        original.hideTitle = false
+        original.hideText = true
 
         let encoder = JSONEncoder()
         let data = try encoder.encode(original)
@@ -159,6 +174,9 @@ final class ExportImportTests: XCTestCase {
         XCTAssertEqual(decoded.animation, original.animation)
         XCTAssertEqual(decoded.animationLoops, original.animationLoops)
         XCTAssertEqual(decoded.hideSystemNotification, original.hideSystemNotification)
+        XCTAssertEqual(decoded.hideIcon, original.hideIcon)
+        XCTAssertEqual(decoded.hideTitle, original.hideTitle)
+        XCTAssertEqual(decoded.hideText, original.hideText)
     }
 
     // MARK: - NotificationRule Codable Tests
@@ -346,7 +364,10 @@ final class ExportImportTests: XCTestCase {
                     "borderColorHex": "FFFFFF",
                     "animation": "none",
                     "animationLoops": false,
-                    "hideSystemNotification": true
+                    "hideSystemNotification": true,
+                    "hideIcon": false,
+                    "hideTitle": false,
+                    "hideText": false
                 }
             ],
             "rules": [
@@ -648,5 +669,255 @@ final class ExportImportTests: XCTestCase {
         XCTAssertEqual(decoded.opacity, 0.001)
         XCTAssertEqual(decoded.dwellTime, 3600)
         XCTAssertEqual(decoded.borderWidth, 100)
+    }
+
+    // MARK: - Backwards Compatibility Tests
+
+    func testStyleDecodesWithMissingNewFields() throws {
+        // Simulate data from v0.1 that doesn't have hideIcon, hideTitle, hideText fields
+        let oldStyleJSON = """
+        {
+            "id": "12345678-1234-1234-1234-123456789ABC",
+            "name": "Old Style",
+            "position": "topRight",
+            "offsetX": 20,
+            "offsetY": 40,
+            "scale": 1.5,
+            "opacity": 0.95,
+            "dwellTime": 5.0,
+            "backgroundColorHex": "1A1A1A",
+            "appColorHex": "AAAAAA",
+            "titleColorHex": "FFFFFF",
+            "subtitleColorHex": "DDDDDD",
+            "bodyColorHex": "DDDDDD",
+            "showAppName": false,
+            "borderWidth": 0,
+            "borderColorHex": "FFFFFF",
+            "animation": "none",
+            "animationLoops": false,
+            "hideSystemNotification": false
+        }
+        """
+
+        let data = oldStyleJSON.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        let style = try decoder.decode(NotificationStyle.self, from: data)
+
+        // New fields should have defaults
+        XCTAssertEqual(style.hideIcon, false)
+        XCTAssertEqual(style.hideTitle, false)
+        XCTAssertEqual(style.hideText, false)
+
+        // Old fields should be preserved
+        XCTAssertEqual(style.name, "Old Style")
+        XCTAssertEqual(style.position, "topRight")
+        XCTAssertEqual(style.borderWidth, 0)  // Old styles had 0, should stay 0
+    }
+
+    func testStyleDecodesWithMinimalFields() throws {
+        // Only id and name are truly required
+        let minimalJSON = """
+        {
+            "id": "12345678-1234-1234-1234-123456789ABC",
+            "name": "Minimal Style"
+        }
+        """
+
+        let data = minimalJSON.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        let style = try decoder.decode(NotificationStyle.self, from: data)
+
+        XCTAssertEqual(style.name, "Minimal Style")
+        // All other fields should have sensible defaults
+        XCTAssertEqual(style.position, "bottomLeft")
+        XCTAssertEqual(style.offsetX, 20)
+        XCTAssertEqual(style.scale, 1.5)
+        XCTAssertEqual(style.hideIcon, false)
+        XCTAssertEqual(style.hideTitle, false)
+        XCTAssertEqual(style.hideText, false)
+    }
+
+    func testRuleDecodesWithMissingFields() throws {
+        // Rule without 'enabled' field (added later)
+        let oldRuleJSON = """
+        {
+            "id": "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
+            "name": "Old Rule",
+            "criteria": {
+                "appName": "Mail"
+            }
+        }
+        """
+
+        let data = oldRuleJSON.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        let rule = try decoder.decode(NotificationRule.self, from: data)
+
+        XCTAssertEqual(rule.name, "Old Rule")
+        XCTAssertEqual(rule.criteria.appName, "Mail")
+        XCTAssertEqual(rule.enabled, true)  // Default to enabled
+        XCTAssertNil(rule.styleId)
+    }
+
+    func testCriteriaDecodesWithMissingFields() throws {
+        // Criteria without 'keywords' or 'matchAll' fields
+        let oldCriteriaJSON = """
+        {
+            "appName": "Safari",
+            "titleContains": "Download"
+        }
+        """
+
+        let data = oldCriteriaJSON.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        let criteria = try decoder.decode(NotificationMatchCriteria.self, from: data)
+
+        XCTAssertEqual(criteria.appName, "Safari")
+        XCTAssertEqual(criteria.titleContains, "Download")
+        XCTAssertEqual(criteria.keywords, "")  // Default
+        XCTAssertEqual(criteria.matchAll, false)  // Default
+    }
+
+    func testExportDataDecodesOldFormat() throws {
+        // Export from an older version without hideIcon/hideTitle/hideText
+        let oldExportJSON = """
+        {
+            "version": 1,
+            "settings": {
+                "positionCorner": "topRight",
+                "positionOffsetX": 20,
+                "positionOffsetY": 40,
+                "scaleFactor": 1.5,
+                "autoStartMonitoring": true,
+                "launchAtLogin": false
+            },
+            "styles": [
+                {
+                    "id": "11111111-1111-1111-1111-111111111111",
+                    "name": "Legacy Style",
+                    "position": "bottomLeft",
+                    "offsetX": 20,
+                    "offsetY": 20,
+                    "scale": 1.5,
+                    "opacity": 0.95,
+                    "dwellTime": 5.0,
+                    "backgroundColorHex": "1A1A1A",
+                    "appColorHex": "AAAAAA",
+                    "titleColorHex": "FFFFFF",
+                    "subtitleColorHex": "DDDDDD",
+                    "bodyColorHex": "DDDDDD",
+                    "showAppName": false,
+                    "borderWidth": 0,
+                    "borderColorHex": "FFFFFF",
+                    "animation": "none",
+                    "animationLoops": false,
+                    "hideSystemNotification": false
+                }
+            ],
+            "rules": [
+                {
+                    "id": "22222222-2222-2222-2222-222222222222",
+                    "name": "Legacy Rule",
+                    "criteria": {
+                        "appName": "Messages"
+                    },
+                    "styleId": "11111111-1111-1111-1111-111111111111",
+                    "enabled": true
+                }
+            ],
+            "defaultBehavior": "noCustom"
+        }
+        """
+
+        let data = oldExportJSON.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        let exportData = try decoder.decode(Settings.ExportData.self, from: data)
+
+        XCTAssertEqual(exportData.styles.count, 1)
+        XCTAssertEqual(exportData.styles[0].name, "Legacy Style")
+        XCTAssertEqual(exportData.styles[0].hideIcon, false)
+        XCTAssertEqual(exportData.styles[0].hideTitle, false)
+        XCTAssertEqual(exportData.styles[0].hideText, false)
+
+        XCTAssertEqual(exportData.rules.count, 1)
+        XCTAssertEqual(exportData.rules[0].name, "Legacy Rule")
+    }
+
+    func testStyleIgnoresUnknownFields() throws {
+        // Style with extra fields that no longer exist or were never valid
+        let futureStyleJSON = """
+        {
+            "id": "12345678-1234-1234-1234-123456789ABC",
+            "name": "Future Style",
+            "position": "topRight",
+            "offsetX": 20,
+            "offsetY": 40,
+            "scale": 1.5,
+            "opacity": 0.95,
+            "dwellTime": 5.0,
+            "backgroundColorHex": "1A1A1A",
+            "appColorHex": "AAAAAA",
+            "titleColorHex": "FFFFFF",
+            "subtitleColorHex": "DDDDDD",
+            "bodyColorHex": "DDDDDD",
+            "showAppName": false,
+            "borderWidth": 1,
+            "borderColorHex": "FFFFFF",
+            "animation": "none",
+            "animationLoops": false,
+            "hideSystemNotification": false,
+            "hideIcon": false,
+            "hideTitle": false,
+            "hideText": false,
+            "removedField": "this field no longer exists",
+            "anotherRemovedField": 12345,
+            "futureFeature": true,
+            "nestedRemoved": {"key": "value"}
+        }
+        """
+
+        let data = futureStyleJSON.data(using: .utf8)!
+        let decoder = JSONDecoder()
+
+        // Should decode successfully, ignoring unknown fields
+        let style = try decoder.decode(NotificationStyle.self, from: data)
+
+        XCTAssertEqual(style.name, "Future Style")
+        XCTAssertEqual(style.position, "topRight")
+        XCTAssertEqual(style.borderWidth, 1)
+    }
+
+    func testRuleIgnoresUnknownFields() throws {
+        // Rule with extra fields that no longer exist
+        let futureRuleJSON = """
+        {
+            "id": "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
+            "name": "Future Rule",
+            "criteria": {
+                "appName": "Mail",
+                "keywords": "test",
+                "matchAll": false,
+                "titleContains": "",
+                "bodyContains": "",
+                "deprecatedField": "ignored",
+                "someOldCriteria": 999
+            },
+            "styleId": "11111111-1111-1111-1111-111111111111",
+            "enabled": true,
+            "removedFeature": "should be ignored",
+            "legacyPriority": 5
+        }
+        """
+
+        let data = futureRuleJSON.data(using: .utf8)!
+        let decoder = JSONDecoder()
+
+        // Should decode successfully, ignoring unknown fields
+        let rule = try decoder.decode(NotificationRule.self, from: data)
+
+        XCTAssertEqual(rule.name, "Future Rule")
+        XCTAssertEqual(rule.criteria.appName, "Mail")
+        XCTAssertEqual(rule.criteria.keywords, "test")
+        XCTAssertEqual(rule.enabled, true)
     }
 }

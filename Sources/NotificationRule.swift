@@ -10,6 +10,21 @@ struct NotificationMatchCriteria: Codable {
     var titleContains: String = ""
     var bodyContains: String = ""
 
+    enum CodingKeys: String, CodingKey {
+        case appName, keywords, matchAll, titleContains, bodyContains
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        appName = try container.decodeIfPresent(String.self, forKey: .appName) ?? ""
+        keywords = try container.decodeIfPresent(String.self, forKey: .keywords) ?? ""
+        matchAll = try container.decodeIfPresent(Bool.self, forKey: .matchAll) ?? false
+        titleContains = try container.decodeIfPresent(String.self, forKey: .titleContains) ?? ""
+        bodyContains = try container.decodeIfPresent(String.self, forKey: .bodyContains) ?? ""
+    }
+
     /// Check if criteria match the notification content
     func matches(_ content: NotificationContent) -> Bool {
         // App name must match if specified
@@ -106,6 +121,21 @@ struct NotificationRule: Codable, Identifiable {
     var criteria: NotificationMatchCriteria = NotificationMatchCriteria()
     var styleId: UUID? = nil  // nil = no custom notification for this rule
     var enabled: Bool = true  // Whether this rule is active
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, criteria, styleId, enabled
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        criteria = try container.decodeIfPresent(NotificationMatchCriteria.self, forKey: .criteria) ?? NotificationMatchCriteria()
+        styleId = try container.decodeIfPresent(UUID.self, forKey: .styleId)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+    }
 
     /// Check if this rule matches the given notification content
     func matches(_ content: NotificationContent) -> Bool {
