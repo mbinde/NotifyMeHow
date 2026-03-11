@@ -309,27 +309,11 @@ class Settings {
     }
 
     private func colorFromHex(_ hex: String) -> NSColor {
-        let cleanHex = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        guard cleanHex.count == 6 else {
-            return NSColor.black.withAlphaComponent(0.85)
-        }
-
-        var rgb: UInt64 = 0
-        Scanner(string: cleanHex).scanHexInt64(&rgb)
-        let r = CGFloat((rgb >> 16) & 0xFF) / 255.0
-        let g = CGFloat((rgb >> 8) & 0xFF) / 255.0
-        let b = CGFloat(rgb & 0xFF) / 255.0
-        return NSColor(red: r, green: g, blue: b, alpha: 0.9)
+        return ColorConverter.colorFromHex(hex)
     }
 
     private func hexFromColor(_ color: NSColor) -> String {
-        guard let rgbColor = color.usingColorSpace(.sRGB) else {
-            return "000000"
-        }
-        let r = Int(rgbColor.redComponent * 255)
-        let g = Int(rgbColor.greenComponent * 255)
-        let b = Int(rgbColor.blueComponent * 255)
-        return String(format: "%02X%02X%02X", r, g, b)
+        return ColorConverter.hexFromColor(color)
     }
 
     // MARK: - Export/Import
