@@ -97,6 +97,19 @@ final class LogicTests: XCTestCase {
         XCTAssertTrue(criteria.matches(content))
     }
 
+    func testKeywordMatchesInSubtitle() {
+        var criteria = NotificationMatchCriteria()
+        criteria.keywords = "important"
+        criteria.matchAll = false
+
+        var content = NotificationContent()
+        content.title = "Message"
+        content.subtitle = "This is important"
+        content.body = "Nothing here"
+
+        XCTAssertTrue(criteria.matches(content))
+    }
+
     func testKeywordWhitespaceTrimming() {
         var criteria = NotificationMatchCriteria()
         criteria.keywords = "  keyword1  ,  keyword2  "
@@ -434,6 +447,17 @@ final class LogicTests: XCTestCase {
         // Both should produce valid colors
         XCTAssertNotNil(config1.backgroundColor)
         XCTAssertNotNil(config2.backgroundColor)
+    }
+
+    func testColorConverterRoundtrip() {
+        // Test that hex -> color -> hex preserves the value
+        let testCases = ["FF0000", "00FF00", "0000FF", "AABBCC", "123456", "FFFFFF", "000000"]
+
+        for hex in testCases {
+            let color = ColorConverter.colorFromHex(hex)
+            let result = ColorConverter.hexFromColor(color)
+            XCTAssertEqual(result.uppercased(), hex.uppercased(), "Roundtrip failed for \(hex)")
+        }
     }
 
     // MARK: - Path Validation Tests
