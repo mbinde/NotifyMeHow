@@ -29,6 +29,9 @@ struct CustomNotificationConfig {
     var animation: String = "none"  // Animation type: none, pulse, jiggle, wiggle, bounce
     var animationLoops: Bool = false  // Whether animation repeats continuously
     var hideSystemNotification: Bool = false  // Move system notification off-screen
+    var hideIcon: Bool = false  // Hide the app icon
+    var hideTitle: Bool = false  // Hide the title
+    var hideText: Bool = false  // Hide subtitle and body text
 }
 
 /// Content extracted from a notification
@@ -118,9 +121,12 @@ class CustomNotificationManager {
         var imageRef: CFTypeRef?
 
         // Try AXImage attribute (some elements expose images this way)
-        if AXUIElementCopyAttributeValue(element, "AXImage" as CFString, &imageRef) == .success {
+        if AXUIElementCopyAttributeValue(element, "AXImage" as CFString, &imageRef) == .success,
+           let ref = imageRef {
             // AXImage can be various types - try to convert to NSImage
-            if let cgImage = imageRef as! CGImage? {
+            // Check if the CFTypeRef is actually a CGImage by comparing type IDs
+            if CFGetTypeID(ref) == CGImage.typeID {
+                let cgImage = ref as! CGImage
                 return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
             }
         }
@@ -277,7 +283,7 @@ class CustomNotificationManager {
         // Determine icon size and layout
         let iconSize: CGFloat = 48 * config.scaleFactor
         let iconSpacing: CGFloat = 12 * config.scaleFactor
-        let hasIcon = content.profileImage != nil || content.appIcon != nil
+        let hasIcon = !config.hideIcon && (content.profileImage != nil || content.appIcon != nil)
 
         // Text width accounts for icon if present
         let textWidth = hasIcon
@@ -299,7 +305,7 @@ class CustomNotificationManager {
         }
 
         // Title
-        if !content.title.isEmpty {
+        if !config.hideTitle && !content.title.isEmpty {
             let titleLabel = createLabel(
                 text: content.title,
                 fontSize: config.titleFontSize * config.scaleFactor,
@@ -312,14 +318,16 @@ class CustomNotificationManager {
 
         // Combine subtitle and body into one text block for consistent limiting
         var combinedText = ""
-        if !content.subtitle.isEmpty {
-            combinedText = content.subtitle
-        }
-        if !content.body.isEmpty {
-            if !combinedText.isEmpty {
-                combinedText += "\n"
+        if !config.hideText {
+            if !content.subtitle.isEmpty {
+                combinedText = content.subtitle
             }
-            combinedText += content.body
+            if !content.body.isEmpty {
+                if !combinedText.isEmpty {
+                    combinedText += "\n"
+                }
+                combinedText += content.body
+            }
         }
 
         if !combinedText.isEmpty {

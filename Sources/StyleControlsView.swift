@@ -36,6 +36,9 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
     private var animationPopup: NSPopUpButton!
     private var animationLoopsCheckbox: NSButton!
     private var hideSystemNotificationCheckbox: NSButton!
+    private var hideIconCheckbox: NSButton!
+    private var hideTitleCheckbox: NSButton!
+    private var hideTextCheckbox: NSButton!
 
     // State
     private var customIconPath: String?
@@ -79,6 +82,23 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         let hideHelp = createHelpButton("When enabled, the macOS system notification will be hidden and only your custom notification will be shown.")
         hideHelp.frame = NSRect(x: padding + 185, y: y + 3, width: 14, height: 14)
         addSubview(hideHelp)
+
+        y -= 24
+        let hideLabel = createLabel("Hide:")
+        hideLabel.frame = NSRect(x: padding, y: y + 2, width: 35, height: 20)
+        addSubview(hideLabel)
+
+        hideIconCheckbox = NSButton(checkboxWithTitle: "Icon", target: nil, action: nil)
+        hideIconCheckbox.frame = NSRect(x: padding + 40, y: y, width: 55, height: 20)
+        addSubview(hideIconCheckbox)
+
+        hideTitleCheckbox = NSButton(checkboxWithTitle: "Title", target: nil, action: nil)
+        hideTitleCheckbox.frame = NSRect(x: padding + 100, y: y, width: 55, height: 20)
+        addSubview(hideTitleCheckbox)
+
+        hideTextCheckbox = NSButton(checkboxWithTitle: "Text", target: nil, action: nil)
+        hideTextCheckbox.frame = NSRect(x: padding + 160, y: y, width: 55, height: 20)
+        addSubview(hideTextCheckbox)
 
         // ═══════════════════════════════════════════════════════════════
         // SECTION: Position & Size
@@ -387,6 +407,9 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         animationPopup.selectItem(at: animationToIndex(style.animation))
         animationLoopsCheckbox.state = style.animationLoops ? .on : .off
         hideSystemNotificationCheckbox.state = style.hideSystemNotification ? .on : .off
+        hideIconCheckbox.state = style.hideIcon ? .on : .off
+        hideTitleCheckbox.state = style.hideTitle ? .on : .off
+        hideTextCheckbox.state = style.hideText ? .on : .off
 
         // Validate offsets after loading
         validateOffsets()
@@ -417,6 +440,9 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
         style.animation = indexToAnimation(animationPopup.indexOfSelectedItem)
         style.animationLoops = animationLoopsCheckbox.state == .on
         style.hideSystemNotification = hideSystemNotificationCheckbox.state == .on
+        style.hideIcon = hideIconCheckbox.state == .on
+        style.hideTitle = hideTitleCheckbox.state == .on
+        style.hideText = hideTextCheckbox.state == .on
         return style
     }
 

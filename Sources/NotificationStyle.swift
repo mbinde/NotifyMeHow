@@ -18,11 +18,63 @@ struct NotificationStyle: Codable, Identifiable {
     var customIconPath: String? = nil           // Path to custom icon image
     var backgroundImagePath: String? = nil      // Path to background image
     var showAppName: Bool = false                // Whether to show app name label
-    var borderWidth: Double = 0                  // Border width (0 = none)
+    var borderWidth: Double = 1                  // Border width (0 = none)
     var borderColorHex: String = "FFFFFF"        // Border color
     var animation: String = "none"               // Animation type: none, pulse, jiggle, wiggle, bounce
     var animationLoops: Bool = false             // Whether animation repeats continuously
     var hideSystemNotification: Bool = false     // Move system notification off-screen when showing custom
+    var hideIcon: Bool = false                   // Hide the app icon in custom notification
+    var hideTitle: Bool = false                  // Hide the title in custom notification
+    var hideText: Bool = false                   // Hide subtitle and body text in custom notification
+
+    // MARK: - Codable with backwards compatibility
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, position, offsetX, offsetY, scale, opacity, dwellTime
+        case backgroundColorHex, appColorHex, titleColorHex, subtitleColorHex, bodyColorHex
+        case customIconPath, backgroundImagePath, showAppName
+        case borderWidth, borderColorHex, animation, animationLoops
+        case hideSystemNotification, hideIcon, hideTitle, hideText
+    }
+
+    init() {}
+
+    init(name: String) {
+        self.name = name
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // Required fields (always present in saved data)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+
+        // All other fields use decodeIfPresent with defaults for backwards compatibility
+        position = try container.decodeIfPresent(String.self, forKey: .position) ?? "bottomLeft"
+        offsetX = try container.decodeIfPresent(Double.self, forKey: .offsetX) ?? 20
+        offsetY = try container.decodeIfPresent(Double.self, forKey: .offsetY) ?? 20
+        scale = try container.decodeIfPresent(Double.self, forKey: .scale) ?? 1.5
+        opacity = try container.decodeIfPresent(Double.self, forKey: .opacity) ?? 0.95
+        dwellTime = try container.decodeIfPresent(Double.self, forKey: .dwellTime) ?? 5.0
+        backgroundColorHex = try container.decodeIfPresent(String.self, forKey: .backgroundColorHex) ?? "1A1A1A"
+        appColorHex = try container.decodeIfPresent(String.self, forKey: .appColorHex) ?? "AAAAAA"
+        titleColorHex = try container.decodeIfPresent(String.self, forKey: .titleColorHex) ?? "FFFFFF"
+        subtitleColorHex = try container.decodeIfPresent(String.self, forKey: .subtitleColorHex) ?? "DDDDDD"
+        bodyColorHex = try container.decodeIfPresent(String.self, forKey: .bodyColorHex) ?? "DDDDDD"
+        customIconPath = try container.decodeIfPresent(String.self, forKey: .customIconPath)
+        backgroundImagePath = try container.decodeIfPresent(String.self, forKey: .backgroundImagePath)
+        showAppName = try container.decodeIfPresent(Bool.self, forKey: .showAppName) ?? false
+        // Note: borderWidth defaults to 0 for old styles (preserves their appearance), but new styles default to 1
+        borderWidth = try container.decodeIfPresent(Double.self, forKey: .borderWidth) ?? 0
+        borderColorHex = try container.decodeIfPresent(String.self, forKey: .borderColorHex) ?? "FFFFFF"
+        animation = try container.decodeIfPresent(String.self, forKey: .animation) ?? "none"
+        animationLoops = try container.decodeIfPresent(Bool.self, forKey: .animationLoops) ?? false
+        hideSystemNotification = try container.decodeIfPresent(Bool.self, forKey: .hideSystemNotification) ?? false
+        hideIcon = try container.decodeIfPresent(Bool.self, forKey: .hideIcon) ?? false
+        hideTitle = try container.decodeIfPresent(Bool.self, forKey: .hideTitle) ?? false
+        hideText = try container.decodeIfPresent(Bool.self, forKey: .hideText) ?? false
+    }
 
     /// Convert to CustomNotificationConfig
     func toConfig() -> CustomNotificationConfig {
@@ -40,13 +92,13 @@ struct NotificationStyle: Codable, Identifiable {
         config.subtitleColor = colorFromHex(subtitleColorHex)
         config.bodyColor = colorFromHex(bodyColorHex)
 
-        // Load custom icon if path is set
-        if let iconPath = customIconPath, !iconPath.isEmpty {
+        // Load custom icon if path is set and valid
+        if let iconPath = customIconPath, !iconPath.isEmpty, isValidImagePath(iconPath) {
             config.customIcon = NSImage(contentsOfFile: iconPath)
         }
 
-        // Load background image if path is set
-        if let bgImagePath = backgroundImagePath, !bgImagePath.isEmpty {
+        // Load background image if path is set and valid
+        if let bgImagePath = backgroundImagePath, !bgImagePath.isEmpty, isValidImagePath(bgImagePath) {
             config.backgroundImage = NSImage(contentsOfFile: bgImagePath)
         }
 
@@ -56,8 +108,46 @@ struct NotificationStyle: Codable, Identifiable {
         config.animation = animation
         config.animationLoops = animationLoops
         config.hideSystemNotification = hideSystemNotification
+        config.hideIcon = hideIcon
+        config.hideTitle = hideTitle
+        config.hideText = hideText
 
         return config
+    }
+
+    /// Validate that a path points to a readable image file
+    private func isValidImagePath(_ path: String) -> Bool {
+        let url = URL(fileURLWithPath: path)
+
+        // Must be a file URL (not remote)
+        guard url.isFileURL else { return false }
+
+        // Resolve symlinks and check path doesn't escape user directories
+        let resolvedPath = url.standardizedFileURL.path
+
+        // Block paths that try to access system directories
+        let blockedPrefixes = ["/System", "/Library", "/private/var", "/etc", "/bin", "/sbin", "/usr"]
+        for prefix in blockedPrefixes {
+            if resolvedPath.hasPrefix(prefix) {
+                return false
+            }
+        }
+
+        // Check file exists and is readable
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: resolvedPath),
+              fileManager.isReadableFile(atPath: resolvedPath) else {
+            return false
+        }
+
+        // Verify it's a valid image extension
+        let validExtensions = ["png", "jpg", "jpeg", "gif", "tiff", "tif", "heic", "webp", "icns"]
+        let ext = url.pathExtension.lowercased()
+        guard validExtensions.contains(ext) else {
+            return false
+        }
+
+        return true
     }
 
     private func colorFromHex(_ hex: String) -> NSColor {
