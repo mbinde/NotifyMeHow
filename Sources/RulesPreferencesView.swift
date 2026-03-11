@@ -219,6 +219,17 @@ class RulesPreferencesView: NSView {
     @objc private func defaultBehaviorChanged() {
         rulesManager.defaultBehavior = defaultBehaviorPopup.indexOfSelectedItem == 0 ? .noCustom : .showCustom
     }
+
+    /// Open the rule editor with a pre-filled rule (called from Recent tab)
+    func openEditorWithRule(_ rule: NotificationRule) {
+        currentEditor = RuleEditorWindowController(rule: rule, isNew: true) { [weak self] savedRule in
+            RulesManager.shared.addRule(savedRule)
+            self?.tableView.reloadData()
+            self?.updateButtonStates()
+            self?.currentEditor = nil
+        }
+        currentEditor?.showWindow()
+    }
 }
 
 // MARK: - NSTableViewDataSource
