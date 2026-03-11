@@ -47,10 +47,12 @@ func getPosition(of element: AXUIElement) -> CGPoint? {
     var positionRef: CFTypeRef?
     let result = AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionRef)
 
-    guard result == .success else { return nil }
+    guard result == .success, let ref = positionRef else { return nil }
 
+    // Verify this is actually an AXValue before using it
+    let axValue = ref as! AXValue  // Safe: AX position attributes are always AXValue
     var point = CGPoint.zero
-    if AXValueGetValue(positionRef as! AXValue, .cgPoint, &point) {
+    if AXValueGetValue(axValue, .cgPoint, &point) {
         return point
     }
     return nil
@@ -61,10 +63,12 @@ func getSize(of element: AXUIElement) -> CGSize? {
     var sizeRef: CFTypeRef?
     let result = AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeRef)
 
-    guard result == .success else { return nil }
+    guard result == .success, let ref = sizeRef else { return nil }
 
+    // Verify this is actually an AXValue before using it
+    let axValue = ref as! AXValue  // Safe: AX size attributes are always AXValue
     var size = CGSize.zero
-    if AXValueGetValue(sizeRef as! AXValue, .cgSize, &size) {
+    if AXValueGetValue(axValue, .cgSize, &size) {
         return size
     }
     return nil
