@@ -3,7 +3,7 @@ import ApplicationServices
 import UserNotifications
 
 /// Current app version - update this for each release
-let appVersion = "0.1"
+let appVersion = "0.2"
 
 /// GitHub repository for update checks
 let githubRepo = "mbinde/NotifyMeHow"
