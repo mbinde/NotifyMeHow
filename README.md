@@ -23,14 +23,20 @@ Settings can be exported and imported, so you can back up your configuration or 
 
 ## Installation
 
-### From Source
+### Homebrew (recommended)
 
 ```bash
-git clone https://github.com/mbinde/NotifyMeHow.git
-cd NotifyMeHow
-./create-app.sh
-open NotifyMeHow.app
+brew tap mbinde/tap
+brew install --cask notifymehow
 ```
+
+### Download Binary
+
+Download the latest release from [GitHub Releases](https://github.com/mbinde/NotifyMeHow/releases), unzip, and drag to Applications.
+
+### Build from Source
+
+See [BUILDING.md](BUILDING.md) for instructions.
 
 ### First Run
 
