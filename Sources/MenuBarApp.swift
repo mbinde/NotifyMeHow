@@ -16,6 +16,7 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
     private let settings = Settings.shared
     private var latestVersion: String?
     private var updateURL: URL?
+    private var aboutWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Create status bar item with fixed length
@@ -69,6 +70,10 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
         checkForUpdates()
     }
 
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
     private func checkForUpdates() {
         guard let url = URL(string: "https://api.github.com/repos/\(githubRepo)/releases/latest") else { return }
 
@@ -115,39 +120,28 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
     private func rebuildMenu() {
         statusMenu.removeAllItems()
 
-        // Header with status
-        let headerItem = NSMenuItem(title: "NotifyMeHow v\(appVersion)", action: nil, keyEquivalent: "")
-        statusMenu.addItem(headerItem)
-
-        // Update available notification
-        if let latestVersion = latestVersion {
-            let updateItem = NSMenuItem(title: "Update Available (v\(latestVersion))", action: #selector(openUpdatePage(_:)), keyEquivalent: "")
-            updateItem.target = self
-            updateItem.image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil)
-            statusMenu.addItem(updateItem)
+        // Start/Stop at the top
+        let isRunning = monitor != nil
+        let hasPerms = isRunning || hasAccessibilityPermissions()
+        let toggleTitle = isRunning ? "Stop Monitoring" : "Start Monitoring"
+        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleMonitoring(_:)), keyEquivalent: "")
+        toggleItem.target = self
+        if isRunning {
+            toggleItem.image = NSImage(systemSymbolName: "stop.circle", accessibilityDescription: nil)
+        } else {
+            toggleItem.image = NSImage(systemSymbolName: "play.circle", accessibilityDescription: nil)
         }
+        statusMenu.addItem(toggleItem)
+
+        // Version info
+        let versionItem = NSMenuItem(title: "NotifyMeHow v\(appVersion)", action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        statusMenu.addItem(versionItem)
 
         // How it works
         let helpItem = NSMenuItem(title: "How It Works...", action: #selector(showHowItWorks(_:)), keyEquivalent: "")
         helpItem.target = self
         statusMenu.addItem(helpItem)
-
-        // Status indicator - use monitor state as primary indicator since
-        // hasAccessibilityPermissions() can return false even when we have permission
-        // (e.g., when launched from a terminal that doesn't have permission)
-        let isRunning = monitor != nil
-        let hasPerms = isRunning || hasAccessibilityPermissions()
-        let statusText: String
-        if isRunning {
-            statusText = "Running"
-        } else if hasPerms {
-            statusText = "Stopped"
-        } else {
-            statusText = "Needs Permission"
-        }
-        let statusMenuItem = NSMenuItem(title: "Status: \(statusText)", action: nil, keyEquivalent: "")
-        statusMenuItem.tag = 100
-        statusMenu.addItem(statusMenuItem)
 
         statusMenu.addItem(NSMenuItem.separator())
 
@@ -178,16 +172,12 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
         positionItem.submenu = positionMenu
         statusMenu.addItem(positionItem)
 
-        statusMenu.addItem(NSMenuItem.separator())
-
-        // Custom notification styles
-        let prefsItem = NSMenuItem(title: "Custom Notification Styles...", action: #selector(showPreferences(_:)), keyEquivalent: ",")
+        // Settings
+        let prefsItem = NSMenuItem(title: "Settings...", action: #selector(showPreferences(_:)), keyEquivalent: ",")
         prefsItem.target = self
-        prefsItem.image = NSImage(systemSymbolName: "wand.and.stars", accessibilityDescription: nil)
         statusMenu.addItem(prefsItem)
 
         // Only show accessibility settings link if we don't have permissions
-        // (monitor running means we have permissions regardless of what the API returns)
         if !hasPerms {
             let accessItem = NSMenuItem(title: "Grant Accessibility Permission...", action: #selector(openAccessibilitySettings(_:)), keyEquivalent: "")
             accessItem.target = self
@@ -196,15 +186,20 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
 
         statusMenu.addItem(NSMenuItem.separator())
 
-        // Start/Stop
-        let toggleTitle = monitor == nil ? "Start Monitoring" : "Stop Monitoring"
-        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleMonitoring(_:)), keyEquivalent: "")
-        toggleItem.target = self
-        toggleItem.tag = 101
-        statusMenu.addItem(toggleItem)
+        // Check for Updates
+        if let latestVersion = latestVersion {
+            let updateItem = NSMenuItem(title: "Update Available (v\(latestVersion))...", action: #selector(openUpdatePage(_:)), keyEquivalent: "")
+            updateItem.target = self
+            updateItem.image = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
+            statusMenu.addItem(updateItem)
+        } else {
+            let checkUpdateItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdatesManual(_:)), keyEquivalent: "")
+            checkUpdateItem.target = self
+            statusMenu.addItem(checkUpdateItem)
+        }
 
         // Quit
-        let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp(_:)), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: "Quit NotifyMeHow", action: #selector(quitApp(_:)), keyEquivalent: "q")
         quitItem.target = self
         statusMenu.addItem(quitItem)
     }
@@ -297,31 +292,157 @@ class MenuBarApp: NSObject, NSApplicationDelegate {
     }
 
     @objc func showHowItWorks(_ sender: NSMenuItem) {
-        let alert = NSAlert()
-        alert.messageText = "How NotifyMeHow Works"
-        alert.informativeText = """
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 320),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "About NotifyMeHow"
+        window.center()
+
+        let contentView = window.contentView!
+        let padding: CGFloat = 20
+        var y = contentView.frame.height - padding
+
+        // Title
+        y -= 24
+        let titleLabel = NSTextField(labelWithString: "NotifyMeHow v\(appVersion)")
+        titleLabel.font = NSFont.boldSystemFont(ofSize: 16)
+        titleLabel.frame = NSRect(x: padding, y: y, width: 380, height: 24)
+        contentView.addSubview(titleLabel)
+
+        // Description
+        y -= 140
+        let descText = """
         macOS notifications can't be resized or restyled—only repositioned.
 
         NotifyMeHow lets you:
-        • Reposition system notifications to any corner or center
-        • Create custom notifications with full control over size, colors, position, and animations
+        • Reposition system notifications to any corner
+        • Create custom notification styles with control over size, colors, position, and animations
         • Set up rules to match notifications by app or keywords
-        • Hide the system notification entirely and show only your custom version
+        • Optionally hide the system notification and show only your custom version
 
         Use "Reposition To" to move system notifications.
-        Use "Custom Notification Styles" to create rules and styles.
-
-        NotifyMeHow v\(appVersion)
+        Use "Settings" to create rules and custom styles.
         """
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+        let descLabel = NSTextField(wrappingLabelWithString: descText)
+        descLabel.font = NSFont.systemFont(ofSize: 12)
+        descLabel.frame = NSRect(x: padding, y: y, width: 380, height: 140)
+        contentView.addSubview(descLabel)
+
+        // Links section
+        y -= 30
+        let linksLabel = NSTextField(labelWithString: "Links:")
+        linksLabel.font = NSFont.boldSystemFont(ofSize: 12)
+        linksLabel.frame = NSRect(x: padding, y: y, width: 380, height: 18)
+        contentView.addSubview(linksLabel)
+
+        y -= 22
+        let githubButton = NSButton(title: "GitHub: github.com/\(githubRepo)", target: self, action: #selector(openGitHub(_:)))
+        githubButton.bezelStyle = .inline
+        githubButton.frame = NSRect(x: padding - 8, y: y, width: 280, height: 20)
+        contentView.addSubview(githubButton)
+
+        y -= 22
+        let emailButton = NSButton(title: "Contact: binde@motleywoods.dev", target: self, action: #selector(openEmail(_:)))
+        emailButton.bezelStyle = .inline
+        emailButton.frame = NSRect(x: padding - 8, y: y, width: 280, height: 20)
+        contentView.addSubview(emailButton)
+
+        // Close button
+        let closeButton = NSButton(title: "Close", target: window, action: #selector(NSWindow.close))
+        closeButton.bezelStyle = .rounded
+        closeButton.keyEquivalent = "\r"
+        closeButton.frame = NSRect(x: contentView.frame.width - padding - 80, y: 15, width: 80, height: 28)
+        contentView.addSubview(closeButton)
+
+        // Show window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Keep a reference so window doesn't disappear
+        self.aboutWindow = window
+    }
+
+    @objc func openGitHub(_ sender: Any) {
+        if let url = URL(string: "https://github.com/\(githubRepo)") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    @objc func openEmail(_ sender: Any) {
+        if let url = URL(string: "mailto:binde@motleywoods.dev") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     @objc func openUpdatePage(_ sender: NSMenuItem) {
         if let url = updateURL {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    @objc func checkForUpdatesManual(_ sender: NSMenuItem) {
+        guard let url = URL(string: "https://api.github.com/repos/\(githubRepo)/releases/latest") else { return }
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 10
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+
+                if let error = error {
+                    let alert = NSAlert()
+                    alert.messageText = "Update Check Failed"
+                    alert.informativeText = "Could not connect to GitHub: \(error.localizedDescription)"
+                    alert.alertStyle = .warning
+                    alert.runModal()
+                    return
+                }
+
+                guard let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let tagName = json["tag_name"] as? String,
+                      let htmlURL = json["html_url"] as? String else {
+                    let alert = NSAlert()
+                    alert.messageText = "Update Check Failed"
+                    alert.informativeText = "Could not parse response from GitHub."
+                    alert.alertStyle = .warning
+                    alert.runModal()
+                    return
+                }
+
+                // Strip leading 'v' if present for comparison
+                let remoteVersion = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
+
+                if remoteVersion != appVersion && self.isNewerVersion(remoteVersion, than: appVersion) {
+                    self.latestVersion = remoteVersion
+                    self.updateURL = URL(string: htmlURL)
+                    self.rebuildMenu()
+
+                    let alert = NSAlert()
+                    alert.messageText = "Update Available"
+                    alert.informativeText = "Version \(remoteVersion) is available. You are running version \(appVersion)."
+                    alert.alertStyle = .informational
+                    alert.addButton(withTitle: "Download")
+                    alert.addButton(withTitle: "Later")
+                    if alert.runModal() == .alertFirstButtonReturn {
+                        if let url = self.updateURL {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                } else {
+                    let alert = NSAlert()
+                    alert.messageText = "You're Up to Date"
+                    alert.informativeText = "NotifyMeHow \(appVersion) is the latest version."
+                    alert.alertStyle = .informational
+                    alert.runModal()
+                }
+            }
+        }.resume()
     }
 
     @objc func quitApp(_ sender: NSMenuItem) {
