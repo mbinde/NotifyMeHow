@@ -29,7 +29,7 @@ ZIP_NAME="${APP_NAME}.zip"
 
 # Version number - UPDATE THIS FOR EACH RELEASE
 # Must match appVersion in Sources/MenuBarApp.swift
-VERSION="0.1"
+VERSION="0.2"
 
 # Your Developer ID - change this to match your certificate name
 DEVELOPER_ID="Developer ID Application: Melissa Binde (755FYD4YJY)"
