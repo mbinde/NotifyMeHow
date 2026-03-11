@@ -56,7 +56,7 @@ class NotificationMonitor {
 
     // Track recently shown notifications to avoid duplicates but allow different content
     private var recentNotifications: [(content: String, time: Date)] = []
-    private let dedupeWindow: TimeInterval = 0.5  // Ignore exact duplicates within 0.5 seconds
+    private let dedupeWindow: TimeInterval = 2.0  // Ignore exact duplicates within 2 seconds
 
     init(position: NotificationPosition = .bottomRight, scaleFactor: CGFloat = 1.0) {
         self.targetPosition = position
@@ -160,6 +160,10 @@ class NotificationMonitor {
         repositionExistingNotifications()
     }
 
+    deinit {
+        stop()
+    }
+
     func stop() {
         if let observer = observer {
             CFRunLoopRemoveSource(
@@ -248,11 +252,14 @@ class NotificationMonitor {
             let isDuplicate = recentNotifications.contains { $0.content == contentHash }
 
             if !isDuplicate {
+                // Record notification for history (used by Recent tab)
+                NotificationHistory.shared.record(content)
+                recentNotifications.append((content: contentHash, time: now))
+
                 if let style = RulesManager.shared.styleFor(content: content) {
                     let config = style.toConfig()
                     CustomNotificationManager.shared.configure(config)
                     CustomNotificationManager.shared.showNotification(content: content)
-                    recentNotifications.append((content: contentHash, time: now))
 
                     // Hide system notification if style requests it
                     if style.hideSystemNotification {

@@ -1,10 +1,11 @@
 import Cocoa
 
 /// Preferences window controller
-class PreferencesWindowController: NSWindowController {
+class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     static let shared = PreferencesWindowController()
 
     private var generalTab: GeneralPreferencesView?
+    private var recentTab: RecentNotificationsView?
     private var rulesTab: RulesPreferencesView?
     private var stylesTab: StylesPreferencesView?
 
@@ -15,10 +16,12 @@ class PreferencesWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "NotifyMeHow - Advanced Settings"
+        window.title = "NotifyMeHow Preferences"
         window.center()
 
         super.init(window: window)
+
+        window.delegate = self
 
         // Create tab view with inset to avoid clipping
         let inset: CGFloat = 10
@@ -31,6 +34,13 @@ class PreferencesWindowController: NSWindowController {
         generalTab = GeneralPreferencesView(frame: NSRect(x: 0, y: 0, width: 440, height: 290))
         generalItem.view = generalTab
         tabView.addTabViewItem(generalItem)
+
+        // Recent tab
+        let recentItem = NSTabViewItem(identifier: "recent")
+        recentItem.label = "Recent"
+        recentTab = RecentNotificationsView(frame: NSRect(x: 0, y: 0, width: 440, height: 290))
+        recentItem.view = recentTab
+        tabView.addTabViewItem(recentItem)
 
         // Rules tab
         let rulesItem = NSTabViewItem(identifier: "rules")
@@ -55,8 +65,13 @@ class PreferencesWindowController: NSWindowController {
 
     func showWindow() {
         generalTab?.loadSettings()
+        recentTab?.refresh()
         rulesTab?.loadRules()
         stylesTab?.loadStyles()
+
+        // Show app in Dock so user can Cmd+Tab to it
+        NSApp.setActivationPolicy(.regular)
+
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
@@ -65,6 +80,13 @@ class PreferencesWindowController: NSWindowController {
         DispatchQueue.main.async {
             self.window?.makeFirstResponder(self.window?.contentView)
         }
+    }
+
+    // MARK: - NSWindowDelegate
+
+    func windowWillClose(_ notification: Notification) {
+        // Hide app from Dock when preferences closes
+        NSApp.setActivationPolicy(.accessory)
     }
 }
 
