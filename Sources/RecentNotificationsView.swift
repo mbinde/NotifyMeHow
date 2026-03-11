@@ -122,13 +122,7 @@ class RecentNotificationsView: NSView {
     }
 
     private func createLabel(_ text: String) -> NSTextField {
-        let label = NSTextField(labelWithString: text)
-        label.font = NSFont.systemFont(ofSize: 13)
-        label.isBezeled = false
-        label.drawsBackground = false
-        label.isEditable = false
-        label.isSelectable = false
-        return label
+        return UIHelpers.createLabel(text)
     }
 
     private func selectRetentionItem() {

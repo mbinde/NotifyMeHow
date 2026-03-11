@@ -542,13 +542,7 @@ class StyleControlsView: NSView, NSTextFieldDelegate {
     // MARK: - Helpers
 
     private func createLabel(_ text: String, bold: Bool = false) -> NSTextField {
-        let label = NSTextField(labelWithString: text)
-        label.font = bold ? NSFont.boldSystemFont(ofSize: 12) : NSFont.systemFont(ofSize: 12)
-        label.isBezeled = false
-        label.drawsBackground = false
-        label.isEditable = false
-        label.isSelectable = false
-        return label
+        return UIHelpers.createLabel(text, bold: bold)
     }
 
     private func createHelpButton(_ helpText: String) -> NSButton {

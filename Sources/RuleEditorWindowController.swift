@@ -140,13 +140,7 @@ class RuleEditorWindowController: NSWindowController {
     }
 
     private func createLabel(_ text: String, bold: Bool = false) -> NSTextField {
-        let label = NSTextField(labelWithString: text)
-        label.font = bold ? NSFont.boldSystemFont(ofSize: 12) : NSFont.systemFont(ofSize: 12)
-        label.isBezeled = false
-        label.drawsBackground = false
-        label.isEditable = false
-        label.isSelectable = false
-        return label
+        return UIHelpers.createLabel(text, bold: bold)
     }
 
     private func createTextField(placeholder: String) -> NSTextField {
