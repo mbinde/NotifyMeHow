@@ -22,6 +22,13 @@
 - Added path validation for custom icon and background image files
 - Fixed unsafe type casts in accessibility code
 
-## [0.1] - 2026-03-01
+## [0.1] - 2026-03-09
 
 Initial release.
+
+- Reposition system notifications to any corner or center of the screen
+- Create custom notification styles with control over size, colors, position, opacity, display duration, icons, background images, and animations
+- Rule-based matching by app name or keywords in title/body
+- Option to replace system notifications entirely with custom versions
+- Export/import settings for backup or sharing across machines
+- Menu bar interface with optional CLI mode

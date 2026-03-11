@@ -26,8 +26,8 @@ Settings can be exported and imported, so you can back up your configuration or 
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/notifymehow.git
-cd notifymehow
+git clone https://github.com/mbinde/NotifyMeHow.git
+cd NotifyMeHow
 ./create-app.sh
 open NotifyMeHow.app
 ```
@@ -44,11 +44,15 @@ Select **Reposition To** from the menu to move all system notifications to a dif
 
 ### Creating Custom Styles
 
-Open **Custom Notification Styles** from the menu, go to the **Styles** tab, and click **Add Style**. Configure the appearance to your liking. Enable **Hide system notification** if you want your custom notification to replace the default entirely.
+Open **Settings** from the menu, go to the **Styles** tab, and click **Add Style**. Configure the appearance to your liking. Enable **Hide system notification** if you want your custom notification to replace the default entirely. You can also hide the icon, title, or body text individually.
 
 ### Setting Up Rules
 
 In the **Rules** tab, click **Add Rule**. Set the app name and/or keywords to match, choose whether any keyword or all keywords must match, and select which style to apply. Rules are evaluated in order—the first match wins.
+
+### Using Recent Notifications
+
+The **Recent** tab shows notifications you've received while monitoring is active. Double-click any notification to create a rule from it—the app name and suggested keywords are pre-filled for you.
 
 ## Requirements
 
